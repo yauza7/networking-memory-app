@@ -20,6 +20,13 @@ const defaultUser: User = {
   ],
 };
 
+/** Best photo URL we can get for a Telegram user — falls back to our bot-side proxy */
+function pickTelegramPhoto(tgUser: { id?: number | string; photo_url?: string }): string {
+  if (tgUser.photo_url) return tgUser.photo_url;
+  if (tgUser.id) return `${APP_URL}/api/user-photo?user_id=${tgUser.id}`;
+  return "";
+}
+
 export function loadCurrentUser(): User {
   try {
     // 1. Try Telegram WebApp user first
@@ -27,12 +34,17 @@ export function loadCurrentUser(): User {
     if (tg?.initDataUnsafe?.user) {
       const tgUser = tg.initDataUnsafe.user;
       const stored = getStoredProfile();
-      return stored ?? {
+      if (stored) {
+        // Always refresh photo from Telegram so it stays current
+        const tgPhoto = pickTelegramPhoto(tgUser);
+        return tgPhoto ? { ...stored, photo: tgPhoto } : stored;
+      }
+      return {
         ...defaultUser,
         id: String(tgUser.id),
         name: [tgUser.first_name, tgUser.last_name].filter(Boolean).join(" ") || defaultUser.name,
         username: tgUser.username || defaultUser.username,
-        photo: tgUser.photo_url || defaultUser.photo,
+        photo: pickTelegramPhoto(tgUser) || defaultUser.photo,
       };
     }
     // 2. Stored profile from onboarding

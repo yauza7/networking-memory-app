@@ -1,5 +1,5 @@
 import { loadCurrentUser, getProfileUrl, getQRValue } from "../utils/userStore";
-import { ExternalLink, Share2, Settings, Edit, Camera, Building2, Mail, Phone, Globe, QrCode, X, Copy, Check } from "lucide-react";
+import { ExternalLink, Share2, Settings, Edit, Building2, Mail, Globe, QrCode, X, Copy, Check } from "lucide-react";
 import { Link } from "react-router";
 import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
@@ -64,7 +64,7 @@ export function MyCard() {
           transition={{ delay: 0.1, duration: 0.4 }}
         >
           <div className="flex items-start gap-4 mb-4">
-            <div className="relative flex-shrink-0">
+            <div className="flex-shrink-0">
               {currentUser.photo ? (
                 <img src={currentUser.photo} alt={currentUser.name} className="w-[72px] h-[72px] rounded-full object-cover avatar-ocean" />
               ) : (
@@ -75,12 +75,6 @@ export function MyCard() {
                   {currentUser.name[0]}
                 </div>
               )}
-              <button
-                className="absolute bottom-0 right-0 p-1.5 rounded-full text-white"
-                style={{ background: "#007AFF", boxShadow: "0 2px 6px rgba(0,122,255,0.4)" }}
-              >
-                <Camera className="w-3 h-3" />
-              </button>
             </div>
             <div className="flex-1">
               <p style={{ fontWeight: 700, fontSize: "18px", color: "#0a1628" }}>{currentUser.name}</p>

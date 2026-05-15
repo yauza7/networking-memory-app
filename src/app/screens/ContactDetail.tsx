@@ -1,11 +1,11 @@
 import { useParams, useNavigate, Link } from "react-router";
 import { mockContacts } from "../utils/mockData";
 import { allContacts } from "../utils/contactStore";
-import { loadCurrentUser } from "../utils/userStore";
+import { loadCurrentUser, getQRValue } from "../utils/userStore";
 import { loadTasks, saveTasks } from "../utils/taskStore";
 import {
   ArrowLeft, MessageCircle, Calendar, Mic, Send, Sparkles,
-  Square, CheckSquare, Plus,
+  Square, CheckSquare, Plus, Share2,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -41,6 +41,18 @@ export function ContactDetail() {
     if (!contact.user.username) return;
     const message = `Привет ${contact.user.name.split(" ")[0]}!\n\nЯ ${currentUser.name}, ${currentUser.role} из ${currentUser.company}. Было приятно познакомиться на ${contact.event}!${contact.aiSummary ? `\n\nПомню, ты ${contact.aiSummary.toLowerCase()}.` : ""}${currentUser.bio ? `\n\nЯ ${currentUser.bio.toLowerCase()}` : ""}\n\nДавай продолжим общение!`;
     window.open(`https://t.me/${contact.user.username}?text=${encodeURIComponent(message)}`);
+  };
+
+  // Send my own W·52 card back so they can save me as a contact too
+  const handleShareMyCard = () => {
+    if (!contact.user.username) return;
+    const cardUrl = getQRValue(currentUser);
+    const firstName = contact.user.name.split(" ")[0];
+    const message = `Привет ${firstName}! Это моя визитка W·52, добавь меня в контакты тоже:\n${cardUrl}`;
+    const tg = (window as any).Telegram?.WebApp;
+    const tgUrl = `https://t.me/${contact.user.username}?text=${encodeURIComponent(message)}`;
+    if (tg?.openTelegramLink) tg.openTelegramLink(tgUrl);
+    else window.open(tgUrl, "_blank");
   };
 
   return (
@@ -98,23 +110,37 @@ export function ContactDetail() {
           </div>
         )}
 
-        {/* Single action */}
+        {/* Actions */}
         {contact.user.username && (
-          <button
-            onClick={() => window.open(`https://t.me/${contact.user.username}`)}
-            className="mt-5 flex items-center justify-center gap-2 rounded-[14px] text-white font-semibold transition-all active:scale-97"
-            style={{
-              background: "#007AFF",
-              height: "50px",
-              fontSize: "17px",
-              width: "100%",
-              maxWidth: "300px",
-              boxShadow: "0 4px 15px rgba(0,122,255,0.3)",
-            }}
-          >
-            <MessageCircle className="w-5 h-5" />
-            Написать в Telegram
-          </button>
+          <div className="w-full max-w-[300px] mt-5 space-y-2">
+            <button
+              onClick={() => window.open(`https://t.me/${contact.user.username}`)}
+              className="w-full flex items-center justify-center gap-2 rounded-[14px] text-white font-semibold transition-all active:scale-97"
+              style={{
+                background: "#007AFF",
+                height: "50px",
+                fontSize: "17px",
+                boxShadow: "0 4px 15px rgba(0,122,255,0.3)",
+              }}
+            >
+              <MessageCircle className="w-5 h-5" />
+              Написать в Telegram
+            </button>
+            <button
+              onClick={handleShareMyCard}
+              className="w-full flex items-center justify-center gap-2 rounded-[14px] font-semibold transition-all active:scale-97"
+              style={{
+                background: "rgba(0,122,255,0.08)",
+                border: "0.5px solid rgba(0,122,255,0.15)",
+                color: "#007AFF",
+                height: "46px",
+                fontSize: "15px",
+              }}
+            >
+              <Share2 className="w-4 h-4" />
+              Поделиться моей визиткой
+            </button>
+          </div>
         )}
       </motion.div>
 

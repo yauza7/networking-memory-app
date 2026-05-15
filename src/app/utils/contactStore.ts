@@ -1,6 +1,7 @@
 import type { Connection } from "./mockData";
 import { addTask } from "./taskStore";
 import type { Task } from "./taskStore";
+import { addNotification } from "./notificationStore";
 
 const KEY = "w52_contacts";
 
@@ -45,6 +46,14 @@ export function addStoredContact(contact: Connection) {
     event: contact.event,
   };
   addTask(task);
+
+  addNotification({
+    type: "contact_added",
+    title: "Новый контакт",
+    message: `${contact.user.name} добавлен(а) в ваши контакты`,
+    contactName: contact.user.name,
+    contactId: contact.id,
+  });
 }
 
 /** All contacts: stored (real) + mock (demo), deduped by id and username */

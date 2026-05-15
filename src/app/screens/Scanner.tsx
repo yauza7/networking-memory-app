@@ -117,7 +117,7 @@ export function Scanner() {
     return cleaned ? cleaned[0] : "";
   };
 
-  /** Only allow https image URLs from a small allowlist */
+  /** Only allow https image URLs (Telegram CDN, our own proxy, common image hosts) */
   const sanitizePhotoUrl = (v: unknown): string | undefined => {
     if (typeof v !== "string" || v.length > 500) return undefined;
     try {
@@ -125,6 +125,8 @@ export function Scanner() {
       if (u.protocol !== "https:") return undefined;
       return u.toString();
     } catch {
+      // Allow our own relative proxy path /api/user-photo?...
+      if (typeof v === "string" && v.startsWith("/api/user-photo?")) return v;
       return undefined;
     }
   };

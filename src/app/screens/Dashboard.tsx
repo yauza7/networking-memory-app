@@ -9,6 +9,7 @@ import { mockContacts } from "../utils/mockData";
 import { allContacts } from "../utils/contactStore";
 import { loadCurrentUser, getQRValue, getProfileUrl } from "../utils/userStore";
 import { loadTasks } from "../utils/taskStore";
+import { unreadCount } from "../utils/notificationStore";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { QRCodeSVG } from "qrcode.react";
@@ -44,10 +45,8 @@ export function Dashboard() {
   const allTasks = loadTasks();
   const activeTasks = allTasks.filter((t) => !t.completed);
 
-  // Notification unread count from localStorage
-  const readIds: string[] = JSON.parse(localStorage.getItem("w52_notifications_read") || "[]");
-  const TOTAL_NOTIFICATIONS = 3; // matches Notifications.tsx ALL_NOTIFICATIONS length
-  const unreadNotifications = Math.max(0, TOTAL_NOTIFICATIONS - readIds.length);
+  // Notification unread count from real notification store
+  const unreadNotifications = unreadCount();
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(profileUrl).then(() => {
