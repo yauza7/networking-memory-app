@@ -28,8 +28,8 @@ export function verifyInitData(initData: string): { ok: boolean; user?: Telegram
       .map(([k, v]) => `${k}=${v}`)
       .join("\n");
 
-    const secretKey = crypto.createHmac("sha256", "WebAppData").update(BOT_TOKEN).digest();
-    const computed = crypto.createHmac("sha256", secretKey).update(dataCheckString).digest("hex");
+    const secretKey: Buffer = crypto.createHmac("sha256", "WebAppData").update(BOT_TOKEN).digest();
+    const computed = crypto.createHmac("sha256", secretKey as unknown as crypto.BinaryLike).update(dataCheckString).digest("hex");
     if (computed !== hash) return { ok: false };
 
     const userJson = params.get("user");
