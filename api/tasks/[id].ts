@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { verifyInitData, getInitData } from "../_lib/auth";
-import { redis, redisConfigured } from "../_lib/redis";
+import { verifyInitData, getInitData } from "../_lib/auth.js";
+import { redis, redisConfigured } from "../_lib/redis.js";
 
 /**
  * PATCH  /api/tasks/<id>  — body: { completed: boolean }

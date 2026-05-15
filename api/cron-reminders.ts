@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { redis, redisConfigured } from "./_lib/redis";
+import { redis, redisConfigured } from "./_lib/redis.js";
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
 const APP_URL = process.env.APP_URL || "https://w52-app.vercel.app";
