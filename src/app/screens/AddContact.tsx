@@ -33,14 +33,18 @@ export function AddContact() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  const username = searchParams.get("username") || "";
-  const dParam   = searchParams.get("d") || "";
+  const username    = (searchParams.get("username") || "").replace(/^@/, "").slice(0, 32);
+  const dParam      = searchParams.get("d") || "";
+  const noteParam   = (searchParams.get("note") || "").slice(0, 500);
+  const eventParam  = (searchParams.get("event") || "").slice(0, 80);
 
   // Decode full profile from QR payload (only present for W52-registered users)
   const decodedProfile = useMemo(() => dParam ? decodeProfilePayload(dParam) : null, [dParam]);
 
-  const [event, setEvent]             = useState("");
-  const [eventCustom, setEventCustom] = useState("");
+  const PRESET_EVENTS_SET = new Set(PRESET_EVENTS);
+  const [event, setEvent]             = useState(eventParam && PRESET_EVENTS_SET.has(eventParam) ? eventParam : (eventParam ? "Другое" : ""));
+  const [eventCustom, setEventCustom] = useState(eventParam && !PRESET_EVENTS_SET.has(eventParam) ? eventParam : "");
+  const [note, setNote]               = useState(noteParam);
 
   const effectiveEvent = event === "Другое" ? eventCustom : event;
 
@@ -74,13 +78,19 @@ export function AddContact() {
       user,
       metAt:        new Date().toISOString(),
       event:        effectiveEvent || undefined,
+      note:         note.trim() || undefined,
       followUpSent: false,
     };
 
     addStoredContact(newContact);
 
-    // Always go to AddNote for voice context
-    navigate(`/add-note?contact=${contactId}`, { replace: true });
+    // If a note was already provided (e.g., from bot /add), go straight to the contact card.
+    // Otherwise, prompt for a voice/text note as before.
+    if (note.trim()) {
+      navigate(`/contact/${contactId}`, { replace: true });
+    } else {
+      navigate(`/add-note?contact=${contactId}`, { replace: true });
+    }
   };
 
   return (
@@ -223,6 +233,28 @@ export function AddContact() {
           )}
         </motion.div>
 
+        {/* Note (pre-fillable from bot's /add command) */}
+        <motion.div
+          className="glass-card p-5"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.12 }}
+        >
+          <p style={{ fontSize: "13px", fontWeight: 600, color: "#8E8E93", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+            Заметка о встрече
+          </p>
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value.slice(0, 500))}
+            placeholder="О чём говорили, что договорились…"
+            rows={3}
+            className="w-full px-4 py-3 text-sm resize-none mt-3"
+          />
+          <p style={{ fontSize: "12px", color: "#8E8E93", marginTop: "6px" }}>
+            {note.length}/500
+          </p>
+        </motion.div>
+
         <motion.p
           className="text-center px-2"
           style={{ fontSize: "13px", color: "#8E8E93" }}
@@ -230,7 +262,9 @@ export function AddContact() {
           animate={{ opacity: 1 }}
           transition={{ delay: 0.15 }}
         >
-          После сохранения вы сможете записать голосовую заметку о встрече
+          {note.trim()
+            ? "Заметка сохранится с контактом"
+            : "После сохранения вы сможете записать голосовую заметку"}
         </motion.p>
       </div>
 
