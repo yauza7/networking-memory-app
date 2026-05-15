@@ -21,6 +21,7 @@ import { Notifications } from "./screens/Notifications";
 import { Settings } from "./screens/Settings";
 import { Tasks } from "./screens/Tasks";
 import { PublicProfile } from "./screens/PublicProfile";
+import { VoiceNote } from "./screens/VoiceNote";
 
 const pageVariants = {
   initial: { opacity: 0, y: 20 },
@@ -59,6 +60,7 @@ function AnimatedRoutes() {
           <Route path="/settings" element={<Settings />} />
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/u/:username" element={<PublicProfile />} />
+          <Route path="/voice-note" element={<VoiceNote />} />
         </Routes>
       </motion.div>
     </AnimatePresence>

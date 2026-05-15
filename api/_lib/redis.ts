@@ -47,6 +47,16 @@ export const redis = {
     }
   },
 
+  setex: async (key: string, ttlSeconds: number, value: string): Promise<void> => {
+    const c = client();
+    if (!c) return;
+    try {
+      await c.setex(key, ttlSeconds, value);
+    } catch (e) {
+      console.error("Redis SETEX error:", e);
+    }
+  },
+
   del: async (key: string): Promise<void> => {
     const c = client();
     if (!c) return;

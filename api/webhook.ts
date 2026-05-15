@@ -1,8 +1,10 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { redis, redisConfigured } from "./_lib/redis.js";
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
 const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || "";
 const APP_URL = process.env.APP_URL || "https://w52-app.vercel.app";
+const HF_TOKEN = process.env.HUGGINGFACE_TOKEN || "";
 const API = `https://api.telegram.org/bot${TOKEN}`;
 
 const escapeHtml = (s: string) =>
@@ -27,12 +29,83 @@ async function tgPost(method: string, body: object) {
   }
 }
 
-async function sendMessage(chatId: number | string, text: string, extra: object = {}) {
-  return tgPost("sendMessage", { chat_id: chatId, text, parse_mode: "HTML", disable_web_page_preview: true, ...extra });
+async function sendMessage(chatId: number | string, text: string, extra: object = {}): Promise<number | null> {
+  const r = await tgPost("sendMessage", { chat_id: chatId, text, parse_mode: "HTML", disable_web_page_preview: true, ...extra });
+  if (!r) return null;
+  try {
+    const data = await r.json();
+    return data?.result?.message_id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+async function editMessage(chatId: number | string, messageId: number, text: string, extra: object = {}) {
+  return tgPost("editMessageText", {
+    chat_id: chatId,
+    message_id: messageId,
+    text,
+    parse_mode: "HTML",
+    disable_web_page_preview: true,
+    ...extra,
+  });
 }
 
 async function answerCallback(id: string, text?: string) {
   return tgPost("answerCallbackQuery", { callback_query_id: id, ...(text ? { text } : {}) });
+}
+
+/**
+ * Downloads a voice file from Telegram and transcribes it via HuggingFace
+ * Whisper-large-v3. Returns the recognized text or null on failure.
+ */
+async function transcribeVoice(fileId: string): Promise<string | null> {
+  if (!HF_TOKEN) {
+    console.error("HUGGINGFACE_TOKEN not set");
+    return null;
+  }
+  try {
+    // 1. Resolve file_path
+    const fileRes = await fetch(`${API}/getFile?file_id=${encodeURIComponent(fileId)}`);
+    const fileJson = await fileRes.json();
+    const filePath: string | undefined = fileJson?.result?.file_path;
+    if (!filePath) {
+      console.error("getFile failed:", fileJson);
+      return null;
+    }
+
+    // 2. Download the audio
+    const audioRes = await fetch(`https://api.telegram.org/file/bot${TOKEN}/${filePath}`);
+    if (!audioRes.ok) {
+      console.error("audio download failed:", audioRes.status);
+      return null;
+    }
+    const audioBuf = Buffer.from(await audioRes.arrayBuffer());
+
+    // 3. Transcribe via HuggingFace Inference API (Whisper-large-v3)
+    const hf = await fetch(
+      "https://api-inference.huggingface.co/models/openai/whisper-large-v3",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${HF_TOKEN}`,
+          "Content-Type": "audio/ogg",
+          "x-wait-for-model": "true",
+        },
+        body: audioBuf,
+      }
+    );
+    if (!hf.ok) {
+      console.error("HF whisper failed:", hf.status, await hf.text());
+      return null;
+    }
+    const data = await hf.json();
+    const text = typeof data?.text === "string" ? data.text.trim() : "";
+    return text || null;
+  } catch (e) {
+    console.error("transcribeVoice error:", e);
+    return null;
+  }
 }
 
 /** Open-App inline keyboard used as a default response */
@@ -291,11 +364,55 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // ─── Voice message ────────────────────────────────────
     else if (update.message?.voice) {
-      await sendMessage(chatId,
-        `🎙️ <b>Голосовая получена</b>\n\n` +
-        `Открой приложение, чтобы добавить эту заметку к контакту (запиши голос или текст там):`,
-        { reply_markup: { inline_keyboard: [[{ text: "📝 Добавить заметку", web_app: { url: `${APP_URL}/add-note` } }]] } }
-      );
+      const voice = update.message.voice;
+
+      // 1. Quick ack so user knows we're working on it
+      const ackId = await sendMessage(chatId, `🎙️ <b>Расшифровываю…</b>\n<i>Первая расшифровка может занять до минуты (модель прогревается).</i>`);
+
+      // 2. Run Whisper
+      const text = await transcribeVoice(voice.file_id);
+
+      if (!text) {
+        if (ackId) {
+          await editMessage(chatId, ackId,
+            `❌ <b>Не удалось расшифровать</b>\n\nПопробуй ещё раз через минуту — модель могла не прогреться.`
+          );
+        }
+      } else {
+        const safe = escapeHtml(text);
+        // 3. Store in Redis with 24h TTL so the Mini App can fetch it
+        const voiceId = `${voice.file_unique_id || Date.now()}`;
+        if (redisConfigured) {
+          await redis.setex(`voice:${chatId}:${voiceId}`, 86400, text);
+        }
+        const url = `${APP_URL}/voice-note?id=${encodeURIComponent(voiceId)}`;
+
+        const display = safe.length > 3500 ? safe.slice(0, 3500) + "…" : safe;
+        if (ackId) {
+          await editMessage(chatId, ackId,
+            `🎙️ <b>Расшифровано</b>\n\n<blockquote>${display}</blockquote>`,
+            {
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: "💾 Сохранить к контакту", web_app: { url } }],
+                  [{ text: "👥 Открыть контакты", web_app: { url: `${APP_URL}/contacts` } }],
+                ],
+              },
+            }
+          );
+        } else {
+          await sendMessage(chatId,
+            `🎙️ <b>Расшифровано</b>\n\n<blockquote>${display}</blockquote>`,
+            {
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: "💾 Сохранить к контакту", web_app: { url } }],
+                ],
+              },
+            }
+          );
+        }
+      }
     }
 
     // ─── Photo ────────────────────────────────────────────
