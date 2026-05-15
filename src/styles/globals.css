@@ -1,0 +1,90 @@
+/* ── Prevent pull-to-refresh / overscroll ───────────────── */
+html, body {
+  overscroll-behavior: none;
+  overscroll-behavior-y: none;
+}
+
+/* ── Liquid glass card ────────────────────────────────────── */
+.glass-card {
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(40px) saturate(200%);
+  -webkit-backdrop-filter: blur(40px) saturate(200%);
+  border: 0.5px solid rgba(255, 255, 255, 0.9);
+  border-radius: 22px;
+  box-shadow:
+    0 8px 32px rgba(0, 80, 180, 0.10),
+    0 2px 8px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+
+/* Apply glass to bg-card too */
+.bg-card {
+  background: rgba(255, 255, 255, 0.78) !important;
+  backdrop-filter: blur(40px) saturate(200%);
+  -webkit-backdrop-filter: blur(40px) saturate(200%);
+  border: 0.5px solid rgba(255, 255, 255, 0.9) !important;
+  box-shadow:
+    0 8px 32px rgba(0, 80, 180, 0.10),
+    0 2px 8px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
+}
+
+/* ── iOS-style tag pills ─────────────────────────────────── */
+.ios-tag, .ocean-tag {
+  background: rgba(0, 122, 255, 0.08);
+  border: 0.5px solid rgba(0, 122, 255, 0.15);
+  border-radius: 20px;
+  color: #007AFF;
+  font-size: 13px;
+  padding: 4px 10px;
+  font-weight: 500;
+  display: inline-block;
+}
+
+/* ── iOS primary button ──────────────────────────────────── */
+.btn-ios {
+  background: linear-gradient(180deg, #3AA3FF 0%, #007AFF 50%, #0063D1 100%);
+  border-radius: 14px;
+  height: 50px;
+  font-size: 17px;
+  font-weight: 600;
+  color: white;
+  box-shadow:
+    0 4px 20px rgba(0, 122, 255, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+
+/* ── Logo serif ──────────────────────────────────────────── */
+.font-serif-logo {
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+/* ── Avatar ring ─────────────────────────────────────────── */
+.avatar-ocean {
+  box-shadow: 0 0 0 2.5px rgba(255, 255, 255, 0.85), 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* ── Scrollbar hide ──────────────────────────────────────── */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* ── Inputs ──────────────────────────────────────────────── */
+input, textarea, select {
+  background: rgba(255, 255, 255, 0.72) !important;
+  border: 0.5px solid rgba(0, 0, 0, 0.1) !important;
+  border-radius: 12px;
+  color: #0a1628 !important;
+}
+input::placeholder, textarea::placeholder {
+  color: #8E8E93 !important;
+}
+input:focus, textarea:focus, select:focus {
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15) !important;
+  border-color: rgba(0, 122, 255, 0.4) !important;
+  outline: none;
+}
