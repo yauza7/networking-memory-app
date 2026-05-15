@@ -1,9 +1,12 @@
+import { pushTask, patchTask, deleteTask } from "./serverSync";
+
 export type TaskType = "manual" | "message" | "transfer" | "call" | "meet" | "send_materials";
 
 export interface Task {
   id: string;
   contactId: string;
   contactName: string;
+  contactUsername?: string;
   text: string;
   completed: boolean;
   dueDate: string;
@@ -49,6 +52,28 @@ export function saveTasks(tasks: Task[]) {
 export function addTask(task: Task) {
   const stored = loadTasks();
   saveTasks([task, ...stored]);
+  // Best-effort push to server for cron-based bot reminders
+  pushTask({
+    id: task.id,
+    contactId: task.contactId,
+    contactName: task.contactName,
+    contactUsername: task.contactUsername,
+    text: task.text,
+    dueDate: task.dueDate,
+    completed: task.completed,
+  }).catch(() => {});
+}
+
+export function updateTaskCompleted(id: string, completed: boolean) {
+  const all = loadTasks();
+  saveTasks(all.map((t) => (t.id === id ? { ...t, completed } : t)));
+  patchTask(id, { completed }).catch(() => {});
+}
+
+export function removeTask(id: string) {
+  const all = loadTasks();
+  saveTasks(all.filter((t) => t.id !== id));
+  deleteTask(id).catch(() => {});
 }
 
 export function createSystemTasks(

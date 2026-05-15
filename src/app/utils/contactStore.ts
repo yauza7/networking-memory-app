@@ -39,6 +39,7 @@ export function addStoredContact(contact: Connection) {
     id: `sys-msg-${Date.now()}`,
     contactId: contact.id,
     contactName: contact.user.name,
+    contactUsername: contact.user.username,
     text: `Написать ${contact.user.name}`,
     completed: false,
     dueDate: in3d.toISOString().split("T")[0],

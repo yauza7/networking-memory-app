@@ -2,11 +2,11 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { ArrowLeft, CheckSquare, Square, Plus, Calendar, X, MessageCircle, Users, Phone, MapPin, Send } from "lucide-react";
 import { mockContacts } from "../utils/mockData";
-import { loadTasks, saveTasks, DEFAULT_SEED_TASKS, type Task as StoredTask } from "../utils/taskStore";
+import { allContacts } from "../utils/contactStore";
+import { loadTasks, addTask as addTaskStore, updateTaskCompleted, type Task as StoredTask } from "../utils/taskStore";
 import { motion, AnimatePresence } from "motion/react";
 
 type Task = StoredTask;
-const seedTasks = DEFAULT_SEED_TASKS; // alias for backward compat in saveTasks filter
 
 const SYSTEM_BADGE: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
   message:       { label: "Написать",   color: "#007AFF", bg: "rgba(0,122,255,0.08)",   icon: <MessageCircle className="w-3 h-3" /> },
@@ -83,21 +83,20 @@ export function Tasks() {
 
   const toggleTask = (taskId: string) => {
     const task = tasks.find((t) => t.id === taskId);
-    const updated = tasks.map((t) => (t.id === taskId ? { ...t, completed: !t.completed } : t));
-    setTasks(updated);
-    saveTasks(updated);
+    if (!task) return;
+    const nextCompleted = !task.completed;
+    updateTaskCompleted(taskId, nextCompleted);
+    setTasks(loadTasks());
 
     // Sync "message" tasks → Dashboard follow-up counter
-    if (task?.type === "message" && task.contactId) {
+    if (task.type === "message" && task.contactId) {
       try {
         const sent: string[] = JSON.parse(localStorage.getItem("w52_followup_sent") || "[]");
-        if (!task.completed) {
-          // marking done → add contactId to sent list
+        if (nextCompleted) {
           if (!sent.includes(task.contactId)) {
             localStorage.setItem("w52_followup_sent", JSON.stringify([...sent, task.contactId]));
           }
         } else {
-          // un-checking → remove from sent list
           localStorage.setItem("w52_followup_sent", JSON.stringify(sent.filter((id) => id !== task.contactId)));
         }
       } catch {}
@@ -106,20 +105,20 @@ export function Tasks() {
 
   const addTask = () => {
     if (!newTaskText.trim() || !selectedContactId || !dueDate) return;
-    const selectedContact = mockContacts.find((c) => c.id === selectedContactId);
+    const selectedContact = allContacts(mockContacts).find((c) => c.id === selectedContactId);
     if (!selectedContact) return;
     const newTask: Task = {
       id: `task-${Date.now()}`,
       contactId: selectedContactId,
       contactName: selectedContact.user.name,
+      contactUsername: selectedContact.user.username,
       text: newTaskText.trim(),
       completed: false,
       dueDate,
       type: selectedType,
     };
-    const updated = [newTask, ...tasks];
-    setTasks(updated);
-    saveTasks(updated);
+    addTaskStore(newTask);
+    setTasks(loadTasks());
     setNewTaskText(""); setSelectedContactId(""); setDueDate(""); setSelectedType("manual");
     setShowAddModal(false);
   };
@@ -267,7 +266,7 @@ export function Tasks() {
                     className="w-full px-4 py-3 text-sm"
                   >
                     <option value="">Выберите контакт</option>
-                    {mockContacts.map((c) => (
+                    {allContacts(mockContacts).map((c) => (
                       <option key={c.id} value={c.id}>{c.user.name}</option>
                     ))}
                   </select>

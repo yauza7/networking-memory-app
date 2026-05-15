@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router";
 import { AnimatePresence, motion } from "motion/react";
 import { Navigation } from "./components/Navigation";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { ensureRegistered } from "./utils/serverSync";
 
 import { SplashScreen } from "./screens/SplashScreen";
 import { Setup } from "./screens/Setup";
@@ -94,6 +95,8 @@ export default function App() {
         console.error("Telegram WebApp init failed:", e);
       }
     }
+    // Register the user with the backend so bot reminders can reach them
+    ensureRegistered().catch(() => {});
   }, []);
 
   // Splash screen — shown once per session
