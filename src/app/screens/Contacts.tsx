@@ -1,7 +1,7 @@
 import { mockContacts } from "../utils/mockData";
 import { allContacts } from "../utils/contactStore";
 import { Link, useSearchParams } from "react-router";
-import { Search, MessageCircle, Download, Sparkles, UserPlus } from "lucide-react";
+import { Search, MessageCircle, Download, Sparkles, UserPlus, Send } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { useState } from "react";
@@ -22,20 +22,55 @@ export function Contacts() {
   const hasOther = contacts.some((c) => !c.event || c.event === "other");
   const events = hasOther ? [...namedEvents, "Другие"] : namedEvents;
 
-  const exportToCSV = () => {
+  const [csvSending, setCsvSending] = useState(false);
+  const [csvStatus, setCsvStatus] = useState<"idle" | "sent" | "error">("idle");
+
+  const buildCSV = (rows_: typeof filteredContacts) => {
     const headers = ["Имя", "Должность", "Компания", "Telegram", "Email", "Событие", "Дата", "Теги", "Заметка"];
-    const rows = filteredContacts.map((contact) => [
+    const rows = rows_.map((contact) => [
       contact.user.name, contact.user.role, contact.user.company || "",
       contact.user.username ? `@${contact.user.username}` : "",
-      contact.user.links.find((l) => l.type === "email")?.url || "",
+      contact.user.links?.find((l) => l.type === "email")?.url || "",
       contact.event || "", new Date(contact.metAt).toLocaleDateString("ru-RU"),
-      contact.user.tags.join("; "), contact.note || "",
+      contact.user.tags?.join("; ") || "", contact.note || "",
     ]);
-    const csv = [headers, ...rows].map((r) => r.map((c) => `"${c}"`).join(",")).join("\n");
+    return [headers, ...rows].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
+  };
+
+  const exportToCSV = async () => {
+    const csv = buildCSV(filteredContacts);
+    const activeFilter = selectedEvent || (selectedCategory !== "Все" ? selectedCategory : null);
+    const label = activeFilter ? activeFilter.replace(/[^a-zA-Z0-9а-яёА-ЯЁ]/g, "_") : "все";
+    const filename = `w52-${label}-${new Date().toISOString().slice(0, 10)}.csv`;
+
+    const tg = (window as any).Telegram?.WebApp;
+    const initData = tg?.initData;
+
+    if (initData) {
+      setCsvSending(true);
+      setCsvStatus("idle");
+      try {
+        const r = await fetch("/api/send-csv", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Telegram-Init-Data": initData },
+          body: JSON.stringify({ csv, filename }),
+        });
+        if (r.ok) {
+          setCsvStatus("sent");
+          setTimeout(() => setCsvStatus("idle"), 3000);
+          setCsvSending(false);
+          return;
+        }
+      } catch {}
+      setCsvStatus("error");
+      setCsvSending(false);
+    }
+
+    // Fallback: browser download
     const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `contacts_${new Date().toISOString().split("T")[0]}.csv`;
+    a.download = filename;
     a.click();
   };
 
@@ -102,11 +137,16 @@ export function Contacts() {
           </Link>
           <button
             onClick={exportToCSV}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors active:scale-95"
-            style={{ background: "rgba(0,122,255,0.08)", border: "0.5px solid rgba(0,122,255,0.15)", color: "#007AFF" }}
+            disabled={csvSending}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors active:scale-95 disabled:opacity-60"
+            style={{
+              background: csvStatus === "sent" ? "rgba(52,199,89,0.1)" : csvStatus === "error" ? "rgba(255,59,48,0.08)" : "rgba(0,122,255,0.08)",
+              border: `0.5px solid ${csvStatus === "sent" ? "rgba(52,199,89,0.2)" : csvStatus === "error" ? "rgba(255,59,48,0.15)" : "rgba(0,122,255,0.15)"}`,
+              color: csvStatus === "sent" ? "#34C759" : csvStatus === "error" ? "#FF3B30" : "#007AFF",
+            }}
           >
-            <Download className="w-4 h-4" />
-            CSV
+            {csvSending ? <Download className="w-4 h-4 animate-bounce" /> : csvStatus === "sent" ? <Send className="w-4 h-4" /> : <Download className="w-4 h-4" />}
+            {csvStatus === "sent" ? "Отправлено!" : csvStatus === "error" ? "Ошибка" : "CSV"}
           </button>
         </div>
       </div>

@@ -4,6 +4,7 @@
     { "path": "/api/cron-reminders", "schedule": "0 9 * * *" }
   ],
   "functions": {
-    "api/webhook.ts": { "maxDuration": 60 }
+    "api/webhook.ts": { "maxDuration": 60 },
+    "api/transcribe.ts": { "maxDuration": 60 }
   }
 }
