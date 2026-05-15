@@ -1,17 +1,17 @@
 import { useNavigate } from "react-router";
 import {
   ArrowLeft, Bell, Shield, Download, Info,
-  LogOut, Globe, ChevronRight, Trash2, UserCircle,
+  LogOut, Globe, ChevronRight, Trash2, UserCircle, FileText,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { mockContacts } from "../utils/mockData";
+import { loadStoredContacts } from "../utils/contactStore";
 import { loadCurrentUser } from "../utils/userStore";
 
 function downloadCSV() {
-  const user = loadCurrentUser();
+  const contacts = loadStoredContacts();
   const rows = [
     ["Имя", "Должность", "Компания", "Telegram", "Познакомились", "Теги", "Дата"],
-    ...mockContacts.map((c) => [
+    ...contacts.map((c) => [
       c.user.name,
       c.user.role,
       c.user.company || "",
@@ -50,6 +50,7 @@ function clearData() {
 export function Settings() {
   const navigate = useNavigate();
   const user = loadCurrentUser();
+  const contactCount = loadStoredContacts().length;
 
   return (
     <div className="min-h-screen pb-20">
@@ -125,7 +126,7 @@ export function Settings() {
             iconBg="rgba(255,149,0,0.1)"
             iconColor="#FF9500"
             label="Экспорт контактов"
-            subtitle={`${mockContacts.length} контактов → CSV`}
+            subtitle={`${contactCount} контактов → CSV`}
             onTap={downloadCSV}
           >
             <ChevronRight className="w-4 h-4" style={{ color: "#C7C7CC" }} />
@@ -145,8 +146,27 @@ export function Settings() {
 
         {/* About */}
         <SectionCard title="О приложении" delay={0.25}>
-          <SettingsRow icon={<Info className="w-4 h-4" />} iconBg="rgba(0,0,0,0.06)" iconColor="#8E8E93" label="W·52" subtitle="Версия 1.0 · w52-app.vercel.app" last>
+          <SettingsRow icon={<Info className="w-4 h-4" />} iconBg="rgba(0,0,0,0.06)" iconColor="#8E8E93" label="W·52" subtitle="Версия 1.0 · w52-app.vercel.app">
             <span style={{ fontSize: "13px", color: "#C7C7CC" }}>v1.0</span>
+          </SettingsRow>
+          <SettingsRow
+            icon={<Shield className="w-4 h-4" />}
+            iconBg="rgba(52,199,89,0.1)"
+            iconColor="#34C759"
+            label="Политика конфиденциальности"
+            onTap={() => window.open("https://w52-app.vercel.app/privacy.html")}
+          >
+            <ChevronRight className="w-4 h-4" style={{ color: "#C7C7CC" }} />
+          </SettingsRow>
+          <SettingsRow
+            icon={<FileText className="w-4 h-4" />}
+            iconBg="rgba(0,122,255,0.08)"
+            iconColor="#007AFF"
+            label="Условия использования"
+            onTap={() => window.open("https://w52-app.vercel.app/terms.html")}
+            last
+          >
+            <ChevronRight className="w-4 h-4" style={{ color: "#C7C7CC" }} />
           </SettingsRow>
         </SectionCard>
 
