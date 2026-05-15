@@ -146,7 +146,21 @@ export function Settings() {
 
         {/* About */}
         <SectionCard title="О приложении" delay={0.25}>
-          <SettingsRow icon={<Info className="w-4 h-4" />} iconBg="rgba(0,0,0,0.06)" iconColor="#8E8E93" label="W·52" subtitle="Версия 1.0 · w52-app.vercel.app">
+          {/* W52 concept explanation */}
+          <div className="px-4 py-4" style={{ borderBottom: "0.5px solid rgba(0,0,0,0.06)" }}>
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,122,255,0.1)", color: "#007AFF" }}>
+                <Info className="w-4 h-4" />
+              </div>
+              <div>
+                <p style={{ fontWeight: 600, fontSize: "14px", color: "#0a1628", marginBottom: "4px" }}>Что такое W·52?</p>
+                <p style={{ fontSize: "13px", color: "#8E8E93", lineHeight: 1.5 }}>
+                  W·52 — это 52 недели в году. Приложение помогает поддерживать нетворкинг на протяжении всего года: сканируй QR-визитки на конференциях, записывай голосовые заметки сразу после встречи, получай напоминания написать нужным людям.
+                </p>
+              </div>
+            </div>
+          </div>
+          <SettingsRow icon={<Info className="w-4 h-4" />} iconBg="rgba(0,0,0,0.06)" iconColor="#8E8E93" label="Версия" subtitle="v1.0 · w52-app.vercel.app">
             <span style={{ fontSize: "13px", color: "#C7C7CC" }}>v1.0</span>
           </SettingsRow>
           <SettingsRow

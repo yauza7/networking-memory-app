@@ -20,10 +20,12 @@ const defaultUser: User = {
   ],
 };
 
-/** Best photo URL we can get for a Telegram user — falls back to our bot-side proxy */
+/** Best photo URL we can get for a Telegram user.
+ *  Always prefer our server-side proxy: the CDN photo_url Telegram injects
+ *  into initData is a short-lived URL that expires within the session. */
 function pickTelegramPhoto(tgUser: { id?: number | string; photo_url?: string }): string {
-  if (tgUser.photo_url) return tgUser.photo_url;
   if (tgUser.id) return `${APP_URL}/api/user-photo?user_id=${tgUser.id}`;
+  if (tgUser.photo_url) return tgUser.photo_url;
   return "";
 }
 

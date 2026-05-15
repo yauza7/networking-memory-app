@@ -12,6 +12,7 @@ const NAV_ITEMS = [
 const HIDDEN_PATHS = [
   "/onboarding", "/add-note", "/share-profile", "/contact/",
   "/edit-profile", "/notifications", "/settings", "/tasks", "/u/",
+  "/add-contact", "/voice-note",
 ];
 
 export function Navigation() {

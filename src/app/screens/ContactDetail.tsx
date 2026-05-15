@@ -1,11 +1,11 @@
 import { useParams, useNavigate, Link } from "react-router";
 import { mockContacts } from "../utils/mockData";
-import { allContacts } from "../utils/contactStore";
+import { allContacts, removeStoredContact } from "../utils/contactStore";
 import { loadCurrentUser, getQRValue } from "../utils/userStore";
 import { loadTasks, saveTasks } from "../utils/taskStore";
 import {
   ArrowLeft, MessageCircle, Calendar, Mic, Send, Sparkles,
-  Square, CheckSquare, Plus, Share2,
+  Square, CheckSquare, Plus, Share2, Trash2,
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
@@ -37,9 +37,39 @@ export function ContactDetail() {
     );
   }
 
+  const handleDelete = () => {
+    if (!confirm(`Удалить ${contact.user.name} из контактов?`)) return;
+    removeStoredContact(contact.id);
+    navigate("/contacts", { replace: true });
+  };
+
+  const handleShareContact = () => {
+    const name = contact.user.name;
+    const parts = [name];
+    if (contact.user.role) parts.push(contact.user.role);
+    if (contact.user.company) parts.push(contact.user.company);
+    if (contact.user.username) parts.push(`https://t.me/${contact.user.username}`);
+    if (contact.note) parts.push(`\n📝 ${contact.note}`);
+    const text = parts.join(" · ");
+    const tg = (window as any).Telegram?.WebApp;
+    if (tg?.openTelegramLink) {
+      tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(text)}`);
+    } else {
+      navigator.clipboard?.writeText(text).then(() => alert("Скопировано!"));
+    }
+  };
+
   const handleSendFollowUp = () => {
     if (!contact.user.username) return;
-    const message = `Привет ${contact.user.name.split(" ")[0]}!\n\nЯ ${currentUser.name}, ${currentUser.role} из ${currentUser.company}. Было приятно познакомиться на ${contact.event}!${contact.aiSummary ? `\n\nПомню, ты ${contact.aiSummary.toLowerCase()}.` : ""}${currentUser.bio ? `\n\nЯ ${currentUser.bio.toLowerCase()}` : ""}\n\nДавай продолжим общение!`;
+    const firstName = contact.user.name.split(" ")[0];
+    const lines: string[] = [`Привет ${firstName}!`, ""];
+    const myIntro = [currentUser.name, currentUser.role, currentUser.company].filter(Boolean).join(", ");
+    lines.push(`Я ${myIntro}.`);
+    if (contact.event) lines.push(`Было приятно познакомиться на ${contact.event}!`);
+    if (contact.aiSummary) lines.push(`\nПомню, ты ${contact.aiSummary.toLowerCase()}.`);
+    if (currentUser.bio) lines.push(`\n${currentUser.bio}`);
+    lines.push("\nДавай продолжим общение!");
+    const message = lines.join("\n");
     window.open(`https://t.me/${contact.user.username}?text=${encodeURIComponent(message)}`);
   };
 
@@ -58,7 +88,7 @@ export function ContactDetail() {
   return (
     <div className="min-h-screen pb-8">
       {/* Back */}
-      <div className="flex items-center gap-2 px-4 pt-14 pb-4">
+      <div className="flex items-center justify-between px-4 pt-14 pb-4">
         <button
           onClick={() => navigate(-1)}
           className="flex items-center gap-1 font-medium transition-colors"
@@ -67,6 +97,14 @@ export function ContactDetail() {
           <ArrowLeft className="w-5 h-5" />
           Назад
         </button>
+        <div className="flex items-center gap-3">
+          <button onClick={handleShareContact} style={{ color: "#007AFF" }}>
+            <Share2 className="w-5 h-5" />
+          </button>
+          <button onClick={handleDelete} style={{ color: "#FF3B30" }}>
+            <Trash2 className="w-5 h-5" />
+          </button>
+        </div>
       </div>
 
       {/* Hero — photo + name */}
@@ -81,15 +119,15 @@ export function ContactDetail() {
             src={contact.user.photo}
             alt={contact.user.name}
             className="w-24 h-24 rounded-full object-cover avatar-ocean mb-4"
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; (e.target as HTMLImageElement).nextElementSibling?.removeAttribute("style"); }}
           />
-        ) : (
-          <div
-            className="w-24 h-24 rounded-full flex items-center justify-center text-white text-3xl font-bold avatar-ocean mb-4"
-            style={{ background: "linear-gradient(135deg, #5AC8FA, #007AFF)" }}
-          >
-            {contact.user.name[0]}
-          </div>
-        )}
+        ) : null}
+        <div
+          className="w-24 h-24 rounded-full flex items-center justify-center text-white text-3xl font-bold avatar-ocean mb-4"
+          style={{ background: "linear-gradient(135deg, #5AC8FA, #007AFF)", display: contact.user.photo ? "none" : "flex" }}
+        >
+          {contact.user.name[0]}
+        </div>
 
         <h1 style={{ fontSize: "24px", fontWeight: 700, color: "#0a1628", letterSpacing: "-0.3px", textAlign: "center" }}>
           {contact.user.name}
@@ -273,10 +311,16 @@ export function ContactDetail() {
               </p>
             </div>
             <p style={{ fontSize: "13px", color: "#3c3c43", lineHeight: 1.6, marginBottom: "14px", whiteSpace: "pre-line" }}>
-              {`Привет ${contact.user.name.split(" ")[0]}!\n\nЯ ${currentUser.name}, ${currentUser.role} из ${currentUser.company}. Было приятно познакомиться на ${contact.event}!`}
-              {contact.aiSummary ? `\n\nПомню, ты ${contact.aiSummary.toLowerCase()}.` : ""}
-              {currentUser.bio ? `\n\nЯ ${currentUser.bio.toLowerCase()}` : ""}
-              {"\n\nДавай продолжим общение!"}
+              {(() => {
+                const firstName = contact.user.name.split(" ")[0];
+                const myIntro = [currentUser.name, currentUser.role, currentUser.company].filter(Boolean).join(", ");
+                const lines = [`Привет ${firstName}!`, "", `Я ${myIntro}.`];
+                if (contact.event) lines.push(`Было приятно познакомиться на ${contact.event}!`);
+                if (contact.aiSummary) lines.push(`\nПомню, ты ${contact.aiSummary.toLowerCase()}.`);
+                if (currentUser.bio) lines.push(`\n${currentUser.bio}`);
+                lines.push("\nДавай продолжим общение!");
+                return lines.join("\n");
+              })()}
             </p>
             <button
               onClick={handleSendFollowUp}

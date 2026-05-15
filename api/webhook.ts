@@ -82,14 +82,14 @@ async function transcribeVoice(fileId: string): Promise<string | null> {
     }
     const audioBuf = new Uint8Array(await audioRes.arrayBuffer());
 
-    // 3. Transcribe via HuggingFace Inference API (Whisper-large-v3)
+    // 3. Transcribe via HuggingFace Inference API
     const hf = await fetch(
-      "https://api-inference.huggingface.co/models/openai/whisper-large-v3",
+      "https://api-inference.huggingface.co/models/openai/whisper-large-v2",
       {
         method: "POST",
         headers: {
           Authorization: `Bearer ${HF_TOKEN}`,
-          "Content-Type": "audio/ogg",
+          "Content-Type": "application/octet-stream",
           "x-wait-for-model": "true",
         },
         body: audioBuf,
@@ -260,11 +260,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           { reply_markup: { inline_keyboard: [[{ text: "📇 Открыть профиль", web_app: { url: `${APP_URL}/share-profile` } }]] } }
         );
       } else {
-        const profileUrl = `${APP_URL}/u/${senderUsername}?ref=tg`;
+        const profileUrl = `${APP_URL}/u/${senderUsername}`;
         await sendMessage(chatId,
           `📇 <b>Твоя визитка W·52</b>\n\n` +
           `<code>${escapeHtml(profileUrl)}</code>\n\n` +
-          `Перешли это сообщение или нажми кнопку — собеседник откроет твою визитку и добавит в контакты в один клик. Если он ещё не в W·52, его сразу попросят зарегистрироваться.`,
+          `Перешли это сообщение или нажми кнопку — собеседник откроет твою визитку и добавит в контакты в один клик.`,
           {
             reply_markup: {
               inline_keyboard: [
@@ -450,11 +450,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       );
     }
 
-    // ─── Plain text ───────────────────────────────────────
+    // ─── Plain text → quick draft note ───────────────────
     else if (text) {
+      // Save as a draft voice-note entry so it can be attached to a contact
+      const draftId = `draft_${Date.now()}`;
+      if (redisConfigured) {
+        await redis.setex(`voice:${chatId}:${draftId}`, 86400, text);
+      }
+      const url = `${APP_URL}/voice-note?id=${encodeURIComponent(draftId)}`;
       await sendMessage(chatId,
-        `Открой W·52 кнопкой ниже 👇\n\n<i>Подсказка: попробуй <code>/add @username заметка</code> чтобы быстро сохранить контакт.</i>`,
-        { reply_markup: { inline_keyboard: mainMenuKeyboard() } }
+        `📝 <b>Заметка сохранена</b>\n\n<blockquote>${escapeHtml(text.slice(0, 500))}</blockquote>\n\n` +
+        (redisConfigured
+          ? `Прикрепи её к нужному контакту:`
+          : `<i>Redis не подключён — заметка не сохранится между сессиями. Добавь REDIS_URL.</i>`),
+        {
+          reply_markup: {
+            inline_keyboard: redisConfigured
+              ? [[{ text: "💾 Прикрепить к контакту", web_app: { url } }],
+                 [{ text: "👥 Контакты", web_app: { url: `${APP_URL}/contacts` } }]]
+              : mainMenuKeyboard(),
+          },
+        }
       );
     }
   } catch (e) {

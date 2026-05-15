@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router";
 import { ArrowLeft, Mic, Pause, Sparkles, Check, Loader2, AlertCircle, Volume2, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { mockContacts } from "../utils/mockData";
-import { allContacts } from "../utils/contactStore";
+import { allContacts, updateStoredContact } from "../utils/contactStore";
 
 const SYSTEM_PROMPT = `You are a networking assistant for affiliate marketing industry.
 Extract key information from a meeting note.
@@ -50,7 +50,7 @@ export function AddNote() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingSecs, setRecordingSecs] = useState(0);
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
-  const [step, setStep] = useState<"input" | "processing" | "done">("input");
+  const [step, setStep] = useState<"input" | "processing" | "done" | "done_no_ai">("input");
   const [aiResult, setAiResult] = useState<AIResult | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
 
@@ -78,16 +78,62 @@ export function AddNote() {
     if (!textNote.trim() && !audioBlob) return;
     setStep("processing");
     setAiError(null);
+
+    const noteText = textNote.trim() || "Голосовая заметка";
+
+    // Always save the note first, regardless of AI outcome
+    if (contactId) {
+      const existing = allContacts(mockContacts).find((c) => c.id === contactId);
+      const prev = existing?.note ? `${existing.note}\n\n` : "";
+      updateStoredContact(contactId, { note: `${prev}${noteText}` });
+    }
+
     try {
-      const result = await analyzeNote(textNote || "Голосовая заметка");
+      const result = await analyzeNote(noteText);
+
+      // Enrich with AI data
+      if (contactId) {
+        const dueDate = new Date(Date.now() + (result.followUpDays ?? 7) * 86400_000)
+          .toISOString().split("T")[0];
+        updateStoredContact(contactId, {
+          aiSummary: result.summary,
+          followUpDate: dueDate,
+          user: {
+            ...(allContacts(mockContacts).find((c) => c.id === contactId)?.user as any),
+            tags: result.tags ?? [],
+          },
+        });
+      }
+
       setAiResult(result);
       setStep("done");
-      setTimeout(goToContact, 3000);
-    } catch (err) {
-      setAiError(err instanceof Error ? err.message : String(err));
-      setStep("input");
+      setTimeout(goToContact, 2500);
+    } catch {
+      // AI failed — note is already saved, just go to contact
+      setAiError("ai_failed");
+      setStep("done_no_ai");
     }
   };
+
+  // ── Saved without AI ───────────────────────────────────────
+  if (step === "done_no_ai") {
+    setTimeout(goToContact, 2000);
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center">
+        <motion.div
+          initial={{ scale: 0.7, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: "spring", stiffness: 380, damping: 22 }}
+          className="w-24 h-24 rounded-3xl flex items-center justify-center mb-6"
+          style={{ background: "#34C759", boxShadow: "0 12px 40px rgba(52,199,89,0.35)" }}
+        >
+          <Check className="w-12 h-12 text-white" />
+        </motion.div>
+        <h2 style={{ fontSize: "22px", fontWeight: 700, color: "#0a1628", marginBottom: "6px" }}>Заметка сохранена</h2>
+        <p style={{ fontSize: "14px", color: "#8E8E93" }}>AI временно недоступен — заметка сохранена без обработки</p>
+      </div>
+    );
+  }
 
   // ── Processing state ────────────────────────────────────────
   if (step === "processing") {
@@ -193,9 +239,9 @@ export function AddNote() {
             >
               <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: "#FF3B30" }} />
               <div>
-                <p style={{ fontSize: "13px", fontWeight: 600, color: "#FF3B30" }}>Ошибка AI</p>
+                <p style={{ fontSize: "13px", fontWeight: 600, color: "#FF3B30" }}>AI недоступен</p>
                 <p style={{ fontSize: "12px", color: "#8E8E93", marginTop: "2px" }}>
-                  Добавьте ANTHROPIC_API_KEY в переменные окружения Vercel
+                  Заметка всё равно сохранится — AI summary создать не удалось
                 </p>
               </div>
             </motion.div>

@@ -107,15 +107,52 @@ export function PublicProfile() {
   };
 
   if (!user) {
+    // If we at least have a username, offer to save them as a bare contact
+    const canSaveByUsername = !!username;
+    const handleSaveByUsername = () => {
+      if (!username) return;
+      const contactId = `c-${Date.now()}`;
+      const bareContact: Connection = {
+        id: contactId,
+        user: {
+          id: `u-${Date.now()}`,
+          name: username,
+          username,
+          role: "",
+          company: "",
+          tags: [],
+          links: [{ type: "telegram", url: `https://t.me/${username}` }],
+        },
+        metAt: new Date().toISOString(),
+        followUpSent: false,
+      };
+      addStoredContact(bareContact);
+      navigate(`/contact/${contactId}`, { replace: true });
+    };
+
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6">
         <div className="w-20 h-20 rounded-full flex items-center justify-center mb-4" style={{ background: "rgba(0,122,255,0.08)" }}>
           <UserPlus className="w-10 h-10" style={{ color: "#8E8E93" }} />
         </div>
-        <h2 style={{ fontSize: "22px", fontWeight: 700, color: "#0a1628", marginBottom: "8px" }}>Профиль не найден</h2>
+        <h2 style={{ fontSize: "22px", fontWeight: 700, color: "#0a1628", marginBottom: "8px" }}>
+          {canSaveByUsername ? `@${username}` : "Профиль не найден"}
+        </h2>
         <p style={{ fontSize: "14px", color: "#8E8E93", textAlign: "center", marginBottom: "24px" }}>
-          Пользователь @{username} не существует или ссылка некорректна
+          {canSaveByUsername
+            ? "Этот пользователь ещё не в W·52 — можно добавить по username"
+            : "Ссылка некорректна или профиль не существует"}
         </p>
+        {canSaveByUsername && (
+          <button
+            onClick={handleSaveByUsername}
+            className="flex items-center gap-2 px-6 rounded-[14px] text-white font-semibold transition-all active:scale-97 mb-3"
+            style={{ background: "#007AFF", height: "50px", fontSize: "17px", boxShadow: "0 4px 15px rgba(0,122,255,0.3)" }}
+          >
+            <UserPlus className="w-5 h-5" />
+            Добавить @{username}
+          </button>
+        )}
         <button
           onClick={() => navigate("/", { replace: true })}
           className="flex items-center gap-2 px-6 rounded-[14px] font-semibold transition-all active:scale-97"

@@ -24,6 +24,18 @@ export function saveStoredContacts(contacts: Connection[]) {
   localStorage.setItem(KEY, JSON.stringify(contacts));
 }
 
+export function removeStoredContact(id: string) {
+  saveStoredContacts(loadStoredContacts().filter((c) => c.id !== id));
+}
+
+export function updateStoredContact(id: string, updates: Partial<Connection>) {
+  const contacts = loadStoredContacts();
+  const idx = contacts.findIndex((c) => c.id === id);
+  if (idx === -1) return;
+  contacts[idx] = { ...contacts[idx], ...updates };
+  saveStoredContacts(contacts);
+}
+
 export function addStoredContact(contact: Connection) {
   const existing = loadStoredContacts();
   // deduplicate by username or id

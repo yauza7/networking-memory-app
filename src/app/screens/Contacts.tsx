@@ -1,7 +1,7 @@
 import { mockContacts } from "../utils/mockData";
 import { allContacts } from "../utils/contactStore";
 import { Link, useSearchParams } from "react-router";
-import { Search, MessageCircle, Download, Sparkles } from "lucide-react";
+import { Search, MessageCircle, Download, Sparkles, UserPlus } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { useState } from "react";
@@ -91,14 +91,24 @@ export function Contacts() {
         <h1 style={{ fontSize: "34px", fontWeight: 700, color: "#0a1628", letterSpacing: "-0.5px", lineHeight: 1 }}>
           Контакты
         </h1>
-        <button
-          onClick={exportToCSV}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors active:scale-95"
-          style={{ background: "rgba(0,122,255,0.08)", border: "0.5px solid rgba(0,122,255,0.15)", color: "#007AFF" }}
-        >
-          <Download className="w-4 h-4" />
-          CSV
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            to="/add-contact"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors active:scale-95"
+            style={{ background: "rgba(0,122,255,0.08)", border: "0.5px solid rgba(0,122,255,0.15)", color: "#007AFF" }}
+          >
+            <UserPlus className="w-4 h-4" />
+            Добавить
+          </Link>
+          <button
+            onClick={exportToCSV}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors active:scale-95"
+            style={{ background: "rgba(0,122,255,0.08)", border: "0.5px solid rgba(0,122,255,0.15)", color: "#007AFF" }}
+          >
+            <Download className="w-4 h-4" />
+            CSV
+          </button>
+        </div>
       </div>
 
       {/* Search */}

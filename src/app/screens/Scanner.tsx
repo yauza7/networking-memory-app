@@ -2,8 +2,6 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { QrCode, Camera, X, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router";
 import { motion } from "motion/react";
-import { addStoredContact } from "../utils/contactStore";
-import type { Connection, User } from "../utils/mockData";
 
 type ScanState = "idle" | "scanning" | "done" | "error";
 
@@ -117,20 +115,6 @@ export function Scanner() {
     return cleaned ? cleaned[0] : "";
   };
 
-  /** Only allow https image URLs (Telegram CDN, our own proxy, common image hosts) */
-  const sanitizePhotoUrl = (v: unknown): string | undefined => {
-    if (typeof v !== "string" || v.length > 500) return undefined;
-    try {
-      const u = new URL(v);
-      if (u.protocol !== "https:") return undefined;
-      return u.toString();
-    } catch {
-      // Allow our own relative proxy path /api/user-photo?...
-      if (typeof v === "string" && v.startsWith("/api/user-photo?")) return v;
-      return undefined;
-    }
-  };
-
   /** Try to decode the real name from a W52 QR `d` param */
   const decodeNameFromD = (d: string): string => {
     try {
@@ -175,64 +159,21 @@ export function Scanner() {
 
   const handleSave = () => {
     let username = "";
-    let decodedProfile: Partial<User> | null = null;
+    let d = "";
 
     try {
       const url = new URL(scannedValue);
       const segs = url.pathname.split("/").filter(Boolean);
-      const d = url.searchParams.get("d");
+      d = url.searchParams.get("d") || "";
 
       if (segs[0] === "u" && segs[1]) username = sanitizeUsername(segs[1]);
       else if (url.hostname === "t.me" && segs[0]) username = sanitizeUsername(segs[0]);
-
-      if (d && d.length <= 4000) {
-        try {
-          const json = decodeURIComponent(escape(atob(d)));
-          if (json.length <= 8000) {
-            const p = JSON.parse(json);
-            if (p && typeof p === "object") {
-              const tags = Array.isArray(p.t)
-                ? p.t.map((t: unknown) => sanitizeStr(t, 40)).filter(Boolean).slice(0, 20)
-                : [];
-              const safeUsername = sanitizeUsername(p.un) || username;
-              decodedProfile = {
-                name:    sanitizeStr(p.n, 80),
-                role:    sanitizeStr(p.r, 80),
-                company: sanitizeStr(p.c, 80),
-                tags,
-                photo:   sanitizePhotoUrl(p.p),
-                username: safeUsername || undefined,
-                bio:     sanitizeStr(p.b, 500),
-                links:   safeUsername ? [{ type: "telegram", url: `https://t.me/${safeUsername}` }] : [],
-              };
-            }
-          }
-        } catch {}
-      }
     } catch {}
 
-    const effectiveUsername = decodedProfile?.username || username || undefined;
-    const name = decodedProfile?.name || effectiveUsername || "Новый контакт";
-
-    const contactId = `c-${Date.now()}`;
-    const contact: Connection = {
-      id: contactId,
-      user: {
-        id: `u-${Date.now()}`,
-        name,
-        username: effectiveUsername,
-        role:    decodedProfile?.role    || "",
-        company: decodedProfile?.company || "",
-        photo:   decodedProfile?.photo,
-        tags:    decodedProfile?.tags    || [],
-        bio:     decodedProfile?.bio,
-        links:   decodedProfile?.links   || (effectiveUsername ? [{ type: "telegram", url: `https://t.me/${effectiveUsername}` }] : []),
-      },
-      metAt: new Date().toISOString(),
-      followUpSent: false,
-    };
-    addStoredContact(contact);
-    navigate(`/contact/${contactId}`);
+    const params = new URLSearchParams();
+    if (username) params.set("username", username);
+    if (d) params.set("d", d);
+    navigate(`/add-contact?${params.toString()}`);
   };
 
   const reset = () => {

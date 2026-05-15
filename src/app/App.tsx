@@ -125,6 +125,9 @@ export default function App() {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
+  // Public /u/ routes work even before registration
+  const isPublicRoute = window.location.pathname.startsWith("/u/");
+
   return (
     <ErrorBoundary>
       <AnimatePresence>
@@ -138,15 +141,17 @@ export default function App() {
           transition={{ duration: 0.4 }}
           className="w-full min-h-full overflow-x-hidden"
         >
-          {needsSetup ? (
-            /* Show setup outside BrowserRouter so navigate("/", replace) works cleanly */
+          {needsSetup && !isPublicRoute ? (
+            /* Capture the current path so we can redirect back after setup */
             <BrowserRouter>
               <Routes>
                 <Route
                   path="*"
                   element={
                     <Setup
-                      onComplete={() => setNeedsSetup(false)}
+                      onComplete={() => {
+                        setNeedsSetup(false);
+                      }}
                     />
                   }
                 />
