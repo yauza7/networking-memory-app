@@ -106,11 +106,36 @@ export function Scanner() {
     }
   }, []); // eslint-disable-line
 
+  /** Sanitize a string from an untrusted QR payload */
+  const sanitizeStr = (v: unknown, max = 200): string =>
+    typeof v === "string" ? v.replace(/[<>]/g, "").slice(0, max) : "";
+
+  /** Telegram usernames: 5-32 chars, alphanumeric + underscore */
+  const sanitizeUsername = (v: unknown): string => {
+    if (typeof v !== "string") return "";
+    const cleaned = v.replace(/^@/, "").match(/^[a-zA-Z0-9_]{1,32}$/);
+    return cleaned ? cleaned[0] : "";
+  };
+
+  /** Only allow https image URLs from a small allowlist */
+  const sanitizePhotoUrl = (v: unknown): string | undefined => {
+    if (typeof v !== "string" || v.length > 500) return undefined;
+    try {
+      const u = new URL(v);
+      if (u.protocol !== "https:") return undefined;
+      return u.toString();
+    } catch {
+      return undefined;
+    }
+  };
+
   /** Try to decode the real name from a W52 QR `d` param */
   const decodeNameFromD = (d: string): string => {
     try {
+      if (d.length > 4000) return "";
       const json = decodeURIComponent(escape(atob(d)));
-      return JSON.parse(json).n || "";
+      const parsed = JSON.parse(json);
+      return sanitizeStr(parsed?.n, 80);
     } catch {
       return "";
     }
@@ -140,7 +165,9 @@ export function Scanner() {
 
   const handleResult = (text: string) => {
     stopCamera();
-    setScannedValue(text);
+    // Cap payload size to prevent UI/DoS issues from huge QR codes
+    const safe = typeof text === "string" ? text.slice(0, 4000) : "";
+    setScannedValue(safe);
     setState("done");
   };
 
@@ -153,23 +180,31 @@ export function Scanner() {
       const segs = url.pathname.split("/").filter(Boolean);
       const d = url.searchParams.get("d");
 
-      if (segs[0] === "u" && segs[1]) username = segs[1];
-      else if (url.hostname === "t.me" && segs[0]) username = segs[0];
+      if (segs[0] === "u" && segs[1]) username = sanitizeUsername(segs[1]);
+      else if (url.hostname === "t.me" && segs[0]) username = sanitizeUsername(segs[0]);
 
-      if (d) {
+      if (d && d.length <= 4000) {
         try {
           const json = decodeURIComponent(escape(atob(d)));
-          const p = JSON.parse(json);
-          decodedProfile = {
-            name:    p.n  || "",
-            role:    p.r  || "",
-            company: p.c  || "",
-            tags:    Array.isArray(p.t) ? p.t : [],
-            photo:   p.p  || undefined,
-            username: p.un || username || undefined,
-            bio:     p.b  || undefined,
-            links:   (p.un || username) ? [{ type: "telegram", url: `https://t.me/${p.un || username}` }] : [],
-          };
+          if (json.length <= 8000) {
+            const p = JSON.parse(json);
+            if (p && typeof p === "object") {
+              const tags = Array.isArray(p.t)
+                ? p.t.map((t: unknown) => sanitizeStr(t, 40)).filter(Boolean).slice(0, 20)
+                : [];
+              const safeUsername = sanitizeUsername(p.un) || username;
+              decodedProfile = {
+                name:    sanitizeStr(p.n, 80),
+                role:    sanitizeStr(p.r, 80),
+                company: sanitizeStr(p.c, 80),
+                tags,
+                photo:   sanitizePhotoUrl(p.p),
+                username: safeUsername || undefined,
+                bio:     sanitizeStr(p.b, 500),
+                links:   safeUsername ? [{ type: "telegram", url: `https://t.me/${safeUsername}` }] : [],
+              };
+            }
+          }
         } catch {}
       }
     } catch {}

@@ -1,24 +1,57 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 
 const TOKEN = process.env.TELEGRAM_BOT_TOKEN!;
-const APP_URL = "https://w52-app.vercel.app";
+const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || "";
+const APP_URL = process.env.APP_URL || "https://w52-app.vercel.app";
 const API = `https://api.telegram.org/bot${TOKEN}`;
 
 async function sendMessage(chatId: number | string, text: string, extra: object = {}) {
-  await fetch(`${API}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML", ...extra }),
-  });
+  try {
+    const r = await fetch(`${API}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML", ...extra }),
+    });
+    if (!r.ok) console.error("sendMessage failed:", r.status, await r.text());
+  } catch (e) {
+    console.error("sendMessage error:", e);
+  }
+}
+
+async function answerCallback(callbackQueryId: string) {
+  try {
+    await fetch(`${API}/answerCallbackQuery`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ callback_query_id: callbackQueryId }),
+    });
+  } catch (e) {
+    console.error("answerCallback error:", e);
+  }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return res.status(200).send("W·52 Bot is running");
 
+  if (!TOKEN) {
+    console.error("TELEGRAM_BOT_TOKEN is not set");
+    return res.status(500).json({ ok: false, error: "Server misconfigured" });
+  }
+
+  // Verify Telegram webhook secret to reject spoofed requests
+  if (WEBHOOK_SECRET) {
+    const provided = req.headers["x-telegram-bot-api-secret-token"];
+    if (provided !== WEBHOOK_SECRET) {
+      return res.status(401).json({ ok: false });
+    }
+  }
+
   const update = req.body;
+  if (!update || typeof update !== "object") {
+    return res.status(200).json({ ok: true });
+  }
 
   try {
-    // Inline query
     if (update.inline_query) {
       await fetch(`${API}/answerInlineQuery`, {
         method: "POST",
@@ -50,8 +83,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!msg) return res.status(200).json({ ok: true });
 
     const chatId = msg.chat.id;
-    const text = update.message?.text || "";
-    const firstName = update.message?.from?.first_name || update.callback_query?.from?.first_name || "друг";
+    const rawText = update.message?.text || "";
+    const text = typeof rawText === "string" ? rawText.slice(0, 4000) : "";
+    const rawName = update.message?.from?.first_name || update.callback_query?.from?.first_name || "друг";
+    // Escape HTML to prevent injection into our HTML-parsed messages
+    const firstName = String(rawName).replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]!)).slice(0, 80);
 
     if (text === "/start" || text.startsWith("/start ")) {
       await sendMessage(chatId,
@@ -67,16 +103,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               [{ text: "🚀 Открыть W·52", web_app: { url: APP_URL } }],
               [{ text: "📇 Моя визитка", callback_data: "my_card" }],
               [{ text: "ℹ️ О приложении", callback_data: "about" }],
+              [{ text: "🔒 Privacy", url: `${APP_URL}/privacy.html` }, { text: "📄 Terms", url: `${APP_URL}/terms.html` }],
             ],
           },
         }
       );
     } else if (update.callback_query?.data === "my_card") {
-      await fetch(`${API}/answerCallbackQuery`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ callback_query_id: update.callback_query.id }),
-      });
+      await answerCallback(update.callback_query.id);
       await sendMessage(chatId,
         `📇 <b>Твоя визитка</b>\n\nОткрой приложение, чтобы настроить профиль и поделиться QR-кодом:`,
         {
@@ -88,11 +121,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       );
     } else if (update.callback_query?.data === "about") {
-      await fetch(`${API}/answerCallbackQuery`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ callback_query_id: update.callback_query.id }),
-      });
+      await answerCallback(update.callback_query.id);
       await sendMessage(chatId,
         `🌊 <b>W·52</b>\n\n` +
         `Приложение для умного нетворкинга.\n\n` +
@@ -101,7 +130,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         `2. На конференции — покажи QR или отсканируй чужой\n` +
         `3. Приложение напомнит написать контакту\n` +
         `4. ИИ создаст персональное follow-up сообщение\n\n` +
-        `<i>Версия: 1.0 · w52-app.vercel.app</i>`,
+        `<i>Версия: 1.0</i>`,
         {
           reply_markup: {
             inline_keyboard: [
@@ -111,7 +140,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
       );
     } else if (text && !text.startsWith("/")) {
-      // Default response
       await sendMessage(chatId,
         `Привет! Нажми кнопку ниже, чтобы открыть W·52 👇`,
         {

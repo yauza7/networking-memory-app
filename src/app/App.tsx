@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router";
 import { AnimatePresence, motion } from "motion/react";
 import { Navigation } from "./components/Navigation";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 
 import { SplashScreen } from "./screens/SplashScreen";
 import { Setup } from "./screens/Setup";
@@ -81,11 +82,17 @@ export default function App() {
   useEffect(() => {
     const tg = (window as any).Telegram?.WebApp;
     if (tg) {
-      tg.ready();
-      tg.expand();
-      tg.disableVerticalSwipes?.();
-      tg.setHeaderColor?.("#EEF6FF");
-      tg.setBackgroundColor?.("#EEF6FF");
+      try {
+        tg.ready();
+        tg.expand();
+        tg.disableVerticalSwipes?.();
+        const bg = tg.themeParams?.bg_color || "#EEF6FF";
+        tg.setHeaderColor?.(bg);
+        tg.setBackgroundColor?.(bg);
+        tg.enableClosingConfirmation?.();
+      } catch (e) {
+        console.error("Telegram WebApp init failed:", e);
+      }
     }
   }, []);
 
@@ -114,7 +121,7 @@ export default function App() {
   }, []);
 
   return (
-    <>
+    <ErrorBoundary>
       <AnimatePresence>
         {showSplash && <SplashScreen onFinish={handleSplashFinish} />}
       </AnimatePresence>
@@ -147,6 +154,6 @@ export default function App() {
           )}
         </motion.div>
       )}
-    </>
+    </ErrorBoundary>
   );
 }
