@@ -24,7 +24,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
     const completed = body.completed === true ? "1" : "0";
     await redis.hset(key, { completed });
-    // Drop from the due-set so cron stops considering it
     if (completed === "1") await redis.zrem("tasks_due", member);
     return res.status(200).json({ ok: true });
   }

@@ -52,7 +52,6 @@ export function saveTasks(tasks: Task[]) {
 export function addTask(task: Task) {
   const stored = loadTasks();
   saveTasks([task, ...stored]);
-  // Best-effort push to server for cron-based bot reminders
   pushTask({
     id: task.id,
     contactId: task.contactId,

@@ -3,8 +3,8 @@ import { verifyInitData, getInitData } from "./_lib/auth.js";
 import { redis, redisConfigured } from "./_lib/redis.js";
 
 /**
- * Registers (or refreshes) the calling user so that the bot can later send
- * them reminder messages. Called on every Mini App startup — idempotent.
+ * Registers (or refreshes) the calling user so the bot can later message them.
+ * Idempotent — called on every Mini App startup.
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
@@ -20,7 +20,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const u = auth.user;
   await redis.hset(`user:${u.id}`, {
     tg_id: u.id,
-    chat_id: u.id, // private chat with bot has chat_id == user_id
+    chat_id: u.id,
     username: u.username || "",
     first_name: u.first_name || "",
     last_name: u.last_name || "",

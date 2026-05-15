@@ -95,7 +95,7 @@ export default function App() {
         console.error("Telegram WebApp init failed:", e);
       }
     }
-    // Register the user with the backend so bot reminders can reach them
+    // Register chat_id so the cron job can DM reminders
     ensureRegistered().catch(() => {});
   }, []);
 

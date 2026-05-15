@@ -29,12 +29,10 @@ async function sendBotMessage(chatId: string | number, text: string, replyMarkup
 }
 
 /**
- * Daily cron — for every due (today or earlier) task that hasn't been reminded
- * yet, ping the owner in their bot chat. Removes processed entries from the
- * sorted set so we don't double-notify.
+ * Daily cron — for every task due (today or earlier) that hasn't been
+ * reminded yet, ping the owner in their bot chat.
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Vercel cron-only access: header set by Vercel when invoking from schedule
   if (CRON_SECRET) {
     const auth = req.headers.authorization || "";
     if (auth !== `Bearer ${CRON_SECRET}`) {
@@ -45,9 +43,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!redisConfigured) return res.status(200).json({ ok: true, ran: false, reason: "no redis" });
 
   const now = Math.floor(Date.now() / 1000);
-  const due = (await redis.zrangebyscore("tasks_due", 0, now)) || [];
+  const due = await redis.zrangebyscore("tasks_due", 0, now);
 
-  // Group by user to batch friendlier messages
   const grouped: Record<string, { id: string; key: string }[]> = {};
   for (const member of due) {
     const [tgId, taskId] = member.split(":");
@@ -63,7 +60,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const taskRows = await Promise.all(items.map((it) => redis.hgetall(it.key)));
     const active = taskRows
       .map((t, i) => ({ t, member: `${tgId}:${items[i].id}` }))
-      .filter((x) => x.t && x.t.completed !== "1" && x.t.reminder_sent !== "1");
+      .filter((x) => x.t && x.t.completed !== "1" && x.t.reminder_sent !== "1") as Array<{
+        t: Record<string, string>;
+        member: string;
+      }>;
 
     if (!active.length) continue;
 
@@ -71,7 +71,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .slice(0, 10)
       .map(({ t }) =>
         t.contact_username
-          ? `• ${escapeHtml(t.text)} (<a href="tg://user?id=${escapeHtml(t.contact_username)}">@${escapeHtml(t.contact_username)}</a>)`
+          ? `• ${escapeHtml(t.text)} (@${escapeHtml(t.contact_username)})`
           : `• ${escapeHtml(t.text)}`
       )
       .join("\n");
@@ -88,7 +88,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ],
     });
 
-    // Mark and remove from due-set
     await Promise.all(
       active.map(async ({ t, member }) => {
         await redis.hset(`task:${tgId}:${t.id}`, { reminder_sent: "1" });

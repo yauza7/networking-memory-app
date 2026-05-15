@@ -1,9 +1,7 @@
 /**
- * Server sync — mirrors tasks to the backend so the cron job can push
- * bot reminders. Best-effort: never throws, falls back silently if offline
- * or if the user opens the app outside Telegram.
+ * Mirrors tasks to the backend so the cron job can push bot reminders.
+ * Best-effort: never throws, silently no-ops if outside Telegram.
  */
-
 function getInitData(): string | null {
   try {
     const tg = (window as any).Telegram?.WebApp;
@@ -49,7 +47,7 @@ export interface ServerTask {
   contactName: string;
   contactUsername?: string;
   text: string;
-  dueDate: string; // YYYY-MM-DD
+  dueDate: string;
   completed?: boolean;
 }
 
