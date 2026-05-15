@@ -80,7 +80,7 @@ async function transcribeVoice(fileId: string): Promise<string | null> {
       console.error("audio download failed:", audioRes.status);
       return null;
     }
-    const audioBuf = Buffer.from(await audioRes.arrayBuffer());
+    const audioBuf = new Uint8Array(await audioRes.arrayBuffer());
 
     // 3. Transcribe via HuggingFace Inference API (Whisper-large-v3)
     const hf = await fetch(

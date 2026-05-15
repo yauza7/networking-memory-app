@@ -4,18 +4,18 @@
  *
  * Configure via env: REDIS_URL=redis://default:<password>@<host>:<port>
  */
-import IORedis from "ioredis";
+import { Redis } from "ioredis";
 
 const URL = process.env.REDIS_URL || "";
 
 export const redisConfigured = !!URL;
 
-let _client: IORedis | null = null;
+let _client: Redis | null = null;
 
-function client(): IORedis | null {
+function client(): Redis | null {
   if (!redisConfigured) return null;
   if (_client) return _client;
-  _client = new IORedis(URL, {
+  _client = new Redis(URL, {
     lazyConnect: false,
     enableReadyCheck: true,
     maxRetriesPerRequest: 2,
