@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { Navigation } from "./components/Navigation";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ensureRegistered } from "./utils/serverSync";
+import { applyTheme, loadTheme } from "./utils/themeStore";
 
 import { SplashScreen } from "./screens/SplashScreen";
 import { Setup } from "./screens/Setup";
@@ -22,6 +23,7 @@ import { Settings } from "./screens/Settings";
 import { Tasks } from "./screens/Tasks";
 import { PublicProfile } from "./screens/PublicProfile";
 import { VoiceNote } from "./screens/VoiceNote";
+import { Tour } from "./screens/Tour";
 
 const pageVariants = {
   initial: { opacity: 0, y: 20 },
@@ -29,7 +31,7 @@ const pageVariants = {
   exit: { opacity: 0, y: -10 },
 };
 
-const pageTransition = { duration: 0.3, ease: [0.4, 0, 0.2, 1] as const };
+const pageTransition = { duration: 0.18, ease: [0.4, 0, 0.2, 1] as const };
 
 function AnimatedRoutes() {
   const location = useLocation();
@@ -61,26 +63,33 @@ function AnimatedRoutes() {
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/u/:username" element={<PublicProfile />} />
           <Route path="/voice-note" element={<VoiceNote />} />
+          <Route path="/tour" element={<Tour />} />
         </Routes>
       </motion.div>
     </AnimatePresence>
   );
 }
 
-/** Show navigation only on main app screens (not setup/public profile) */
+/** Show navigation only on main app screens (not setup/public profile/tour) */
 function AppShell({ needsSetup }: { needsSetup: boolean }) {
   const location = useLocation();
   const isPublic = location.pathname.startsWith("/u/");
   const isSetup = location.pathname === "/setup";
+  const isTour = location.pathname === "/tour";
   return (
     <>
       <AnimatedRoutes />
-      {!needsSetup && !isPublic && !isSetup && <Navigation />}
+      {!needsSetup && !isPublic && !isSetup && !isTour && <Navigation />}
     </>
   );
 }
 
 export default function App() {
+  // Apply saved theme on boot
+  useEffect(() => {
+    applyTheme(loadTheme());
+  }, []);
+
   // Telegram WebApp init
   useEffect(() => {
     const tg = (window as any).Telegram?.WebApp;
@@ -109,6 +118,11 @@ export default function App() {
   // First-launch registration check
   const [needsSetup, setNeedsSetup] = useState(
     () => !localStorage.getItem("w52_profile")
+  );
+
+  // After Setup → show full Tour walkthrough (until completed)
+  const [needsTour, setNeedsTour] = useState(
+    () => !localStorage.getItem("w52_tour_completed")
   );
 
   const handleSplashFinish = () => {
@@ -151,6 +165,21 @@ export default function App() {
                     <Setup
                       onComplete={() => {
                         setNeedsSetup(false);
+                      }}
+                    />
+                  }
+                />
+              </Routes>
+            </BrowserRouter>
+          ) : needsTour && !isPublicRoute ? (
+            <BrowserRouter>
+              <Routes>
+                <Route
+                  path="*"
+                  element={
+                    <Tour
+                      onComplete={() => {
+                        setNeedsTour(false);
                       }}
                     />
                   }

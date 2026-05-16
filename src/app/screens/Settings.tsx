@@ -1,19 +1,41 @@
+/**
+ * W·52 — Настройки (Settings)
+ * Moody. Без секции «Приватность», все строки кликабельны.
+ * Светлая тема — заглушка «скоро».
+ */
+import { useState } from "react";
 import { useNavigate } from "react-router";
 import {
-  ArrowLeft, Bell, Shield, Download, Info,
-  LogOut, Globe, ChevronRight, Trash2, UserCircle, FileText,
+  Bell,
+  Download,
+  Info,
+  LogOut,
+  ChevronRight,
+  Trash2,
+  UserCircle,
+  FileText,
+  Sun,
+  Shield,
+  Sparkles,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { loadStoredContacts } from "../utils/contactStore";
 import { loadCurrentUser } from "../utils/userStore";
+import { loadTheme, saveTheme, type Theme } from "../utils/themeStore";
+import {
+  Atmosphere,
+  Avatar,
+  Hero,
+  RoundBtn,
+  cardStyle,
+} from "../components/brand/Brand";
 
 function downloadCSV() {
   const contacts = loadStoredContacts();
   const rows = [
-    ["Имя", "Должность", "Компания", "Telegram", "Познакомились", "Теги", "Дата"],
+    ["Имя", "Компания", "Telegram", "Познакомились", "Теги", "Дата"],
     ...contacts.map((c) => [
       c.user.name,
-      c.user.role,
       c.user.company || "",
       c.user.username ? `@${c.user.username}` : "",
       c.event || "",
@@ -43,6 +65,7 @@ function clearData() {
     localStorage.removeItem("w52_tasks");
     localStorage.removeItem("w52_followup_sent");
     localStorage.removeItem("w52_notifications_read");
+    localStorage.removeItem("w52_contacts");
     window.location.href = "/";
   }
 }
@@ -52,206 +75,375 @@ export function Settings() {
   const user = loadCurrentUser();
   const contactCount = loadStoredContacts().length;
 
-  return (
-    <div className="min-h-screen pb-20">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 pt-14 pb-4">
-        <button onClick={() => navigate(-1)} style={{ color: "#007AFF" }}>
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <h1 style={{ fontSize: "28px", fontWeight: 700, color: "#0a1628", letterSpacing: "-0.4px" }}>
-          Настройки
-        </h1>
-      </div>
+  const [pushEnabled, setPushEnabled] = useState(true);
+  const [theme, setTheme] = useState<Theme>(() => loadTheme());
+  const toggleThemeRow = () => {
+    const next: Theme = theme === "light" ? "dark" : "light";
+    setTheme(next);
+    saveTheme(next);
+  };
 
-      <div className="px-4 space-y-4">
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "var(--bg)",
+        color: "var(--ivory)",
+        position: "relative",
+        paddingBottom: 120,
+      }}
+    >
+      <Atmosphere intensity={0.3} />
+
+      <div style={{ position: "relative", zIndex: 1 }}>
+        {/* Top */}
+        <div style={{ padding: "56px 18px 0" }}>
+          <RoundBtn onClick={() => navigate(-1)}>
+            <svg width="10" height="14" viewBox="0 0 10 14">
+              <path
+                d="M8 1L2 7l6 6"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+              />
+            </svg>
+          </RoundBtn>
+        </div>
+
+        <div style={{ padding: "16px 22px 0" }}>
+          <Hero size={32}>Настройки</Hero>
+        </div>
+
         {/* Profile preview */}
         <motion.div
-          className="glass-card p-4"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.05 }}
+          style={{ padding: "22px 16px 0" }}
         >
-          <div className="flex items-center gap-3">
-            {user.photo ? (
-              <img src={user.photo} alt={user.name} className="w-14 h-14 rounded-full object-cover avatar-ocean" />
-            ) : (
+          <button
+            onClick={() => navigate("/edit-profile")}
+            style={{
+              ...cardStyle,
+              padding: "14px 16px",
+              width: "100%",
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              background: "var(--surface)",
+              cursor: "pointer",
+              textAlign: "left",
+            }}
+          >
+            <Avatar
+              name={user.name}
+              photo={user.photo}
+              username={user.username}
+              size={48}
+              ring={false}
+            />
+            <div style={{ flex: 1, minWidth: 0 }}>
               <div
-                className="w-14 h-14 rounded-full flex items-center justify-center text-white text-xl font-bold avatar-ocean"
-                style={{ background: "linear-gradient(135deg, #5AC8FA, #007AFF)" }}
+                style={{
+                  fontFamily: "var(--sans)",
+                  fontWeight: 500,
+                  fontSize: 15,
+                  color: "var(--ivory)",
+                }}
               >
-                {user.name[0]}
+                {user.name}
               </div>
-            )}
-            <div className="flex-1">
-              <p style={{ fontWeight: 700, fontSize: "16px", color: "#0a1628" }}>{user.name}</p>
-              <p style={{ fontSize: "13px", color: "#8E8E93" }}>{user.role}</p>
-              {user.username && (
-                <p style={{ fontSize: "13px", color: "#007AFF" }}>@{user.username}</p>
-              )}
+              <div
+                className="text-muted-w"
+                style={{ fontSize: 12, marginTop: 2 }}
+              >
+                {user.role}
+                {user.username && ` · @${user.username}`}
+              </div>
             </div>
-            <button
-              onClick={() => navigate("/edit-profile")}
-              className="px-3 py-1.5 rounded-full text-sm font-medium"
-              style={{ background: "rgba(0,122,255,0.1)", color: "#007AFF" }}
-            >
-              Изменить
-            </button>
-          </div>
+            <ChevronRight className="w-4 h-4" style={{ color: "var(--faint)" }} />
+          </button>
         </motion.div>
 
-        {/* Notifications */}
-        <SectionCard title="Уведомления" delay={0.1}>
-          <SettingsRow icon={<Bell className="w-4 h-4" />} iconBg="rgba(0,122,255,0.1)" iconColor="#007AFF" label="Push-уведомления" subtitle="Follow-up напоминания">
-            <div className="w-11 h-6 rounded-full relative flex-shrink-0" style={{ background: "#34C759" }}>
-              <div className="absolute right-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow-sm" />
-            </div>
-          </SettingsRow>
-        </SectionCard>
-
-        {/* Privacy */}
-        <SectionCard title="Приватность" delay={0.15}>
-          <SettingsRow icon={<Shield className="w-4 h-4" />} iconBg="rgba(52,199,89,0.1)" iconColor="#34C759" label="Кто видит профиль" subtitle="Все по ссылке">
-            <ChevronRight className="w-4 h-4" style={{ color: "#C7C7CC" }} />
-          </SettingsRow>
-          <SettingsRow icon={<Globe className="w-4 h-4" />} iconBg="rgba(0,122,255,0.1)" iconColor="#007AFF" label="Язык" subtitle="Русский" last>
-            <ChevronRight className="w-4 h-4" style={{ color: "#C7C7CC" }} />
-          </SettingsRow>
-        </SectionCard>
-
-        {/* Data */}
-        <SectionCard title="Данные" delay={0.2}>
-          <SettingsRow
-            icon={<Download className="w-4 h-4" />}
-            iconBg="rgba(255,149,0,0.1)"
-            iconColor="#FF9500"
-            label="Экспорт контактов"
-            subtitle={`${contactCount} контактов → CSV`}
-            onTap={downloadCSV}
+        {/* Preferences */}
+        <Section title="Параметры" delay={0.1}>
+          <Row
+            icon={<Bell className="w-4 h-4" />}
+            iconBg="oklch(0.86 0.13 195 / 0.18)"
+            iconColor="var(--signal)"
+            label="Push-уведомления"
+            sublabel="Follow-up напоминания"
+            onTap={() => setPushEnabled((v) => !v)}
           >
-            <ChevronRight className="w-4 h-4" style={{ color: "#C7C7CC" }} />
-          </SettingsRow>
-          <SettingsRow
-            icon={<UserCircle className="w-4 h-4" />}
-            iconBg="rgba(0,122,255,0.1)"
-            iconColor="#007AFF"
-            label="Профиль"
-            subtitle="Редактировать данные визитки"
-            onTap={() => navigate("/edit-profile")}
+            <Toggle on={pushEnabled} />
+          </Row>
+          <Row
+            icon={<Sun className="w-4 h-4" />}
+            iconBg="oklch(0.80 0.110 65 / 0.18)"
+            iconColor="var(--amber)"
+            label="Светлая тема"
+            sublabel={theme === "light" ? "Включена" : "Тёмная по умолчанию"}
+            onTap={toggleThemeRow}
             last
           >
-            <ChevronRight className="w-4 h-4" style={{ color: "#C7C7CC" }} />
-          </SettingsRow>
-        </SectionCard>
+            <Toggle on={theme === "light"} />
+          </Row>
+        </Section>
+
+        {/* Data */}
+        <Section title="Данные" delay={0.15}>
+          <Row
+            icon={<Download className="w-4 h-4" />}
+            iconBg="oklch(0.80 0.110 65 / 0.18)"
+            iconColor="var(--amber)"
+            label="Экспорт контактов"
+            sublabel={`${contactCount} → CSV`}
+            onTap={downloadCSV}
+          >
+            <ChevronRight className="w-4 h-4" style={{ color: "var(--faint)" }} />
+          </Row>
+          <Row
+            icon={<UserCircle className="w-4 h-4" />}
+            iconBg="oklch(0.86 0.13 195 / 0.18)"
+            iconColor="var(--signal)"
+            label="Редактировать профиль"
+            sublabel="Данные визитки"
+            onTap={() => navigate("/edit-profile")}
+          >
+            <ChevronRight className="w-4 h-4" style={{ color: "var(--faint)" }} />
+          </Row>
+          <Row
+            icon={<Sparkles className="w-4 h-4" />}
+            iconBg="oklch(0.86 0.13 195 / 0.18)"
+            iconColor="var(--signal)"
+            label="Пройти тур заново"
+            sublabel="Все фишки за минуту"
+            onTap={() => {
+              localStorage.removeItem("w52_tour_completed");
+              window.location.href = "/tour";
+            }}
+            last
+          >
+            <ChevronRight className="w-4 h-4" style={{ color: "var(--faint)" }} />
+          </Row>
+        </Section>
 
         {/* About */}
-        <SectionCard title="О приложении" delay={0.25}>
-          {/* W52 concept explanation */}
-          <div className="px-4 py-4" style={{ borderBottom: "0.5px solid rgba(0,0,0,0.06)" }}>
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,122,255,0.1)", color: "#007AFF" }}>
-                <Info className="w-4 h-4" />
+        <Section title="О приложении" delay={0.2}>
+          <div
+            style={{
+              padding: "14px 16px",
+              borderBottom: "0.5px solid var(--line-soft)",
+            }}
+          >
+            <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+              <div
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: 10,
+                  background: "oklch(0.86 0.13 195 / 0.14)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <Info className="w-3.5 h-3.5" style={{ color: "var(--signal)" }} />
               </div>
               <div>
-                <p style={{ fontWeight: 600, fontSize: "14px", color: "#0a1628", marginBottom: "4px" }}>Что такое W·52?</p>
-                <p style={{ fontSize: "13px", color: "#8E8E93", lineHeight: 1.5 }}>
-                  W·52 — это 52 недели в году. Приложение помогает поддерживать нетворкинг на протяжении всего года: сканируй QR-визитки на конференциях, записывай голосовые заметки сразу после встречи, получай напоминания написать нужным людям.
+                <p
+                  style={{
+                    fontFamily: "var(--sans)",
+                    fontWeight: 500,
+                    fontSize: 13.5,
+                    color: "var(--ivory)",
+                    margin: 0,
+                  }}
+                >
+                  Что такое Echo?
+                </p>
+                <p
+                  style={{
+                    fontFamily: "var(--sans)",
+                    fontSize: 12.5,
+                    color: "var(--muted-fg)",
+                    lineHeight: 1.5,
+                    marginTop: 4,
+                  }}
+                >
+                  Где-то в океане плавает кит, который поёт на 52 герцах —
+                  частоте, которую не слышит никто из его сородичей. Echo
+                  помогает не пропадать с радара: сканируй QR, записывай
+                  голосом контекст и оставайся на связи. Every signal finds
+                  its receiver.
                 </p>
               </div>
             </div>
           </div>
-          <SettingsRow icon={<Info className="w-4 h-4" />} iconBg="rgba(0,0,0,0.06)" iconColor="#8E8E93" label="Версия" subtitle="v1.0 · w52-app.vercel.app">
-            <span style={{ fontSize: "13px", color: "#C7C7CC" }}>v1.0</span>
-          </SettingsRow>
-          <SettingsRow
+          <Row
             icon={<Shield className="w-4 h-4" />}
-            iconBg="rgba(52,199,89,0.1)"
-            iconColor="#34C759"
+            iconBg="oklch(0.80 0.110 65 / 0.14)"
+            iconColor="var(--amber)"
             label="Политика конфиденциальности"
             onTap={() => window.open("https://w52-app.vercel.app/privacy.html")}
           >
-            <ChevronRight className="w-4 h-4" style={{ color: "#C7C7CC" }} />
-          </SettingsRow>
-          <SettingsRow
+            <ChevronRight className="w-4 h-4" style={{ color: "var(--faint)" }} />
+          </Row>
+          <Row
             icon={<FileText className="w-4 h-4" />}
-            iconBg="rgba(0,122,255,0.08)"
-            iconColor="#007AFF"
+            iconBg="oklch(0.86 0.13 195 / 0.14)"
+            iconColor="var(--signal)"
             label="Условия использования"
             onTap={() => window.open("https://w52-app.vercel.app/terms.html")}
             last
           >
-            <ChevronRight className="w-4 h-4" style={{ color: "#C7C7CC" }} />
-          </SettingsRow>
-        </SectionCard>
+            <ChevronRight className="w-4 h-4" style={{ color: "var(--faint)" }} />
+          </Row>
+        </Section>
 
-        {/* Danger zone */}
-        <motion.button
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          onClick={clearData}
-          className="w-full glass-card p-4 flex items-center gap-3 transition-all active:scale-[0.99]"
-        >
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(255,59,48,0.1)" }}>
-            <Trash2 className="w-4 h-4" style={{ color: "#FF3B30" }} />
-          </div>
-          <div className="text-left flex-1">
-            <p style={{ fontWeight: 600, fontSize: "14px", color: "#FF3B30" }}>Сбросить данные</p>
-            <p style={{ fontSize: "12px", color: "#8E8E93" }}>Удалить профиль и все настройки</p>
-          </div>
-        </motion.button>
-
-        <motion.button
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.32 }}
-          onClick={() => {
-            localStorage.removeItem("w52_profile");
-            window.location.href = "/setup";
-          }}
-          className="w-full glass-card p-4 flex items-center gap-3 transition-all active:scale-[0.99]"
-        >
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: "rgba(255,59,48,0.08)" }}>
-            <LogOut className="w-4 h-4" style={{ color: "#FF3B30" }} />
-          </div>
-          <div className="text-left">
-            <p style={{ fontWeight: 600, fontSize: "14px", color: "#FF3B30" }}>Сменить аккаунт</p>
-            <p style={{ fontSize: "12px", color: "#8E8E93" }}>Вернуться к экрану регистрации</p>
-          </div>
-        </motion.button>
+        {/* Danger */}
+        <div style={{ padding: "16px 16px 0", display: "flex", flexDirection: "column", gap: 10 }}>
+          <button
+            onClick={() => {
+              localStorage.removeItem("w52_profile");
+              window.location.href = "/setup";
+            }}
+            style={{
+              ...cardStyle,
+              padding: "14px 16px",
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              background: "var(--surface)",
+              cursor: "pointer",
+            }}
+          >
+            <div
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 11,
+                background: "oklch(0.68 0.19 25 / 0.10)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <LogOut className="w-4 h-4" style={{ color: "var(--danger)" }} />
+            </div>
+            <div style={{ flex: 1, textAlign: "left" }}>
+              <div
+                style={{
+                  fontFamily: "var(--sans)",
+                  fontWeight: 500,
+                  fontSize: 14,
+                  color: "var(--danger)",
+                }}
+              >
+                Сменить аккаунт
+              </div>
+              <div className="text-muted-w" style={{ fontSize: 12, marginTop: 2 }}>
+                Вернуться к регистрации
+              </div>
+            </div>
+          </button>
+          <button
+            onClick={clearData}
+            style={{
+              ...cardStyle,
+              padding: "14px 16px",
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              background: "var(--surface)",
+              cursor: "pointer",
+            }}
+          >
+            <div
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: 11,
+                background: "oklch(0.68 0.19 25 / 0.10)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Trash2 className="w-4 h-4" style={{ color: "var(--danger)" }} />
+            </div>
+            <div style={{ flex: 1, textAlign: "left" }}>
+              <div
+                style={{
+                  fontFamily: "var(--sans)",
+                  fontWeight: 500,
+                  fontSize: 14,
+                  color: "var(--danger)",
+                }}
+              >
+                Сбросить данные
+              </div>
+              <div className="text-muted-w" style={{ fontSize: 12, marginTop: 2 }}>
+                Удалить профиль и контакты
+              </div>
+            </div>
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-function SectionCard({ title, children, delay }: { title: string; children: React.ReactNode; delay: number }) {
+function Section({
+  title,
+  children,
+  delay,
+}: {
+  title: string;
+  children: React.ReactNode;
+  delay: number;
+}) {
   return (
     <motion.div
-      className="glass-card overflow-hidden"
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay }}
+      style={{ padding: "20px 16px 0" }}
     >
-      <p style={{
-        fontSize: "13px", fontWeight: 600, color: "#8E8E93",
-        textTransform: "uppercase", letterSpacing: "0.5px",
-        padding: "12px 16px 8px",
-      }}>
+      <p
+        className="eyebrow"
+        style={{
+          padding: "0 6px 10px",
+          color: "var(--signal-dim)",
+        }}
+      >
         {title}
       </p>
-      {children}
+      <div style={{ ...cardStyle, padding: 0, overflow: "hidden" }}>
+        {children}
+      </div>
     </motion.div>
   );
 }
 
-function SettingsRow({
-  icon, iconBg, iconColor, label, subtitle, children, onTap, last,
+function Row({
+  icon,
+  iconBg,
+  iconColor,
+  label,
+  sublabel,
+  children,
+  onTap,
+  last,
 }: {
   icon: React.ReactNode;
   iconBg: string;
   iconColor: string;
   label: string;
-  subtitle?: string;
+  sublabel?: string;
   children?: React.ReactNode;
   onTap?: () => void;
   last?: boolean;
@@ -259,21 +451,85 @@ function SettingsRow({
   return (
     <button
       onClick={onTap}
-      disabled={!onTap && !children}
-      className="w-full flex items-center gap-3 px-4 py-3 transition-all active:bg-black/5 text-left"
-      style={!last ? { borderBottom: "0.5px solid rgba(0,0,0,0.06)" } : {}}
+      style={{
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        padding: "14px 16px",
+        background: "transparent",
+        border: "none",
+        borderBottom: last ? "none" : "0.5px solid var(--line-soft)",
+        textAlign: "left",
+        cursor: onTap ? "pointer" : "default",
+        color: "var(--ivory)",
+      }}
     >
       <div
-        className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
-        style={{ background: iconBg, color: iconColor }}
+        style={{
+          width: 32,
+          height: 32,
+          borderRadius: 10,
+          background: iconBg,
+          color: iconColor,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          flexShrink: 0,
+        }}
       >
         {icon}
       </div>
-      <div className="flex-1">
-        <p style={{ fontWeight: 500, fontSize: "14px", color: "#0a1628" }}>{label}</p>
-        {subtitle && <p style={{ fontSize: "12px", color: "#8E8E93", marginTop: "1px" }}>{subtitle}</p>}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{
+            fontFamily: "var(--sans)",
+            fontWeight: 500,
+            fontSize: 14,
+            color: "var(--ivory)",
+          }}
+        >
+          {label}
+        </div>
+        {sublabel && (
+          <div
+            className="text-muted-w"
+            style={{ fontSize: 12, marginTop: 2 }}
+          >
+            {sublabel}
+          </div>
+        )}
       </div>
       {children}
     </button>
+  );
+}
+
+function Toggle({ on }: { on: boolean }) {
+  return (
+    <div
+      style={{
+        width: 40,
+        height: 22,
+        borderRadius: 11,
+        background: on ? "var(--signal)" : "var(--line)",
+        position: "relative",
+        transition: "background 0.18s ease",
+        flexShrink: 0,
+      }}
+    >
+      <div
+        style={{
+          position: "absolute",
+          top: 2,
+          left: on ? 20 : 2,
+          width: 18,
+          height: 18,
+          borderRadius: "50%",
+          background: on ? "var(--abyss)" : "var(--ivory)",
+          transition: "left 0.18s ease",
+        }}
+      />
+    </div>
   );
 }

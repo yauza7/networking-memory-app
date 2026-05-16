@@ -1,67 +1,224 @@
+/**
+ * W·52 — Задачи (Tasks)
+ * Moody. Coord eyebrow, serif title, mono filter chips, active vs completed sections,
+ * cyan-accent "НАПИСАТЬ" button on tasks tied to a Telegram username.
+ */
 import { useState } from "react";
-import { Link, useNavigate } from "react-router";
-import { ArrowLeft, CheckSquare, Square, Plus, Calendar, X, MessageCircle, Users, Phone, MapPin, Send } from "lucide-react";
+import { Link } from "react-router";
+import {
+  MessageCircle,
+  Users,
+  Phone,
+  MapPin,
+  Send,
+  X,
+} from "lucide-react";
 import { mockContacts } from "../utils/mockData";
 import { allContacts } from "../utils/contactStore";
-import { loadTasks, addTask as addTaskStore, updateTaskCompleted, type Task as StoredTask } from "../utils/taskStore";
+import {
+  loadTasks,
+  addTask as addTaskStore,
+  updateTaskCompleted,
+  type Task as StoredTask,
+} from "../utils/taskStore";
 import { motion, AnimatePresence } from "motion/react";
+import {
+  Atmosphere,
+  Avatar,
+  Chip,
+  RoundBtn,
+  IvoryBtn,
+  GhostBtn,
+  Hero,
+  cardStyle,
+} from "../components/brand/Brand";
 
 type Task = StoredTask;
 
-const SYSTEM_BADGE: Record<string, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
-  message:       { label: "Написать",   color: "#007AFF", bg: "rgba(0,122,255,0.08)",   icon: <MessageCircle className="w-3 h-3" /> },
-  transfer:      { label: "Передать",   color: "#FF9500", bg: "rgba(255,149,0,0.08)",   icon: <Users className="w-3 h-3" /> },
-  call:          { label: "Позвонить",  color: "#34C759", bg: "rgba(52,199,89,0.08)",   icon: <Phone className="w-3 h-3" /> },
-  meet:          { label: "Встреча",    color: "#AF52DE", bg: "rgba(175,82,222,0.08)",  icon: <MapPin className="w-3 h-3" /> },
-  send_materials:{ label: "Материалы", color: "#FF3B30", bg: "rgba(255,59,48,0.08)",   icon: <Send className="w-3 h-3" /> },
+const TASK_BADGE: Record<
+  string,
+  { label: string; icon: React.ReactNode }
+> = {
+  message: { label: "Написать", icon: <MessageCircle className="w-3 h-3" /> },
+  transfer: { label: "Передать", icon: <Users className="w-3 h-3" /> },
+  call: { label: "Позвонить", icon: <Phone className="w-3 h-3" /> },
+  meet: { label: "Встреча", icon: <MapPin className="w-3 h-3" /> },
+  send_materials: { label: "Материалы", icon: <Send className="w-3 h-3" /> },
 };
 
-function TaskCard({ task, i, onToggle }: { task: Task; i: number; onToggle: (id: string) => void }) {
+function TaskCard({
+  task,
+  onToggle,
+}: {
+  task: Task;
+  onToggle: (id: string) => void;
+}) {
+  const contact = allContacts(mockContacts).find((c) => c.id === task.contactId);
+  const overdue =
+    !task.completed && task.dueDate && new Date(task.dueDate) < new Date();
+  const dueStr = task.dueDate
+    ? overdue
+      ? `${Math.floor(
+          (Date.now() - new Date(task.dueDate).getTime()) / 86400000
+        )} ДН. ПРОСРОЧЕНО`
+      : `ДО ${new Date(task.dueDate)
+          .toLocaleDateString("ru-RU", { day: "numeric", month: "long" })
+          .toUpperCase()}`
+    : "";
+
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 8, scale: 0.97 }}
-      animate={{ opacity: task.completed ? 0.55 : 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, x: 40, scale: 0.95, transition: { duration: 0.22 } }}
-      transition={{ delay: i * 0.03, duration: 0.28 }}
-      className="glass-card p-4"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: task.completed ? 0.5 : 1, y: 0 }}
+      exit={{ opacity: 0, x: 30, transition: { duration: 0.22 } }}
+      style={{ ...cardStyle, padding: "14px 14px" }}
     >
-      <div className="flex items-start gap-3">
-        <button onClick={() => onToggle(task.id)} className="mt-0.5 flex-shrink-0 transition-transform active:scale-90">
-          {task.completed
-            ? <CheckSquare className="w-5 h-5" style={{ color: "#34C759" }} />
-            : <Square className="w-5 h-5" style={{ color: "#8E8E93" }} />}
+      <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+        <button
+          onClick={() => onToggle(task.id)}
+          style={{
+            width: 22,
+            height: 22,
+            borderRadius: 7,
+            border: `1.6px solid ${
+              task.completed
+                ? "var(--signal)"
+                : overdue
+                ? "var(--amber)"
+                : "var(--line)"
+            }`,
+            background: task.completed ? "var(--signal)" : "transparent",
+            flexShrink: 0,
+            marginTop: 1,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {task.completed && (
+            <svg width="12" height="12" viewBox="0 0 12 12">
+              <path
+                d="M2.5 6L5 8.5l4.5-5"
+                stroke="var(--abyss)"
+                strokeWidth="1.8"
+                fill="none"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          )}
         </button>
-        <div className="flex-1">
-          <Link to={`/contact/${task.contactId}`} className="text-sm font-semibold" style={{ color: "#007AFF" }}>
-            {task.contactName}
-          </Link>
-          <p
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <Link
+            to={`/contact/${task.contactId}`}
             style={{
-              fontSize: "14px",
-              color: task.completed ? "#8E8E93" : "#0a1628",
-              marginTop: "2px",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              textDecoration: "none",
+              color: "inherit",
+            }}
+          >
+            {contact && (
+              <Avatar
+                name={contact.user.name}
+                photo={contact.user.photo}
+                size={20}
+                ring={false}
+              />
+            )}
+            <span
+              className="font-mono"
+              style={{
+                fontSize: 10.5,
+                color: "var(--signal-dim)",
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+              }}
+            >
+              {task.contactUsername ? `@${task.contactUsername}` : task.contactName}
+            </span>
+          </Link>
+          <div
+            style={{
+              fontFamily: "var(--sans)",
+              fontSize: 15,
+              marginTop: 6,
+              lineHeight: 1.35,
               textDecoration: task.completed ? "line-through" : "none",
             }}
           >
             {task.text}
-          </p>
-          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-            <Calendar className="w-3 h-3" style={{ color: "#8E8E93" }} />
-            <span style={{ fontSize: "12px", color: "#8E8E93" }}>
-              {new Date(task.dueDate).toLocaleDateString("ru-RU")}
-            </span>
-            {!task.completed && new Date(task.dueDate) < new Date() && (
-              <span style={{ fontSize: "12px", color: "#FF3B30", fontWeight: 600 }}>Просрочено</span>
-            )}
-            {task.type !== "manual" && SYSTEM_BADGE[task.type] && (
+          </div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              marginTop: 10,
+              flexWrap: "wrap",
+            }}
+          >
+            {dueStr && (
               <span
-                className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
-                style={{ background: SYSTEM_BADGE[task.type].bg, color: SYSTEM_BADGE[task.type].color }}
+                className="font-mono"
+                style={{
+                  fontSize: 10,
+                  color: overdue ? "var(--amber)" : "var(--faint)",
+                  letterSpacing: "0.14em",
+                }}
               >
-                {SYSTEM_BADGE[task.type].icon}
-                {SYSTEM_BADGE[task.type].label}
+                {dueStr}
               </span>
+            )}
+            {task.type !== "manual" && TASK_BADGE[task.type] && (
+              <span
+                className="font-mono"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 4,
+                  fontSize: 10,
+                  color: "var(--muted-fg)",
+                  letterSpacing: "0.10em",
+                  textTransform: "uppercase",
+                  padding: "3px 8px",
+                  borderRadius: 100,
+                  background: "var(--surface)",
+                  border: "1px solid var(--line-soft)",
+                }}
+              >
+                {TASK_BADGE[task.type].icon}
+                {TASK_BADGE[task.type].label}
+              </span>
+            )}
+            {!task.completed && task.contactUsername && (
+              <button
+                onClick={() =>
+                  window.open(`https://t.me/${task.contactUsername}`)
+                }
+                style={{
+                  height: 26,
+                  padding: "0 11px",
+                  borderRadius: 100,
+                  background: "transparent",
+                  color: "var(--ivory)",
+                  border: "1px solid var(--line-soft)",
+                  fontFamily: "var(--mono)",
+                  fontSize: 10,
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  cursor: "pointer",
+                }}
+              >
+                <MessageCircle className="w-2.5 h-2.5" />
+                TG
+              </button>
             )}
           </div>
         </div>
@@ -71,15 +228,14 @@ function TaskCard({ task, i, onToggle }: { task: Task; i: number; onToggle: (id:
 }
 
 export function Tasks() {
-  const navigate = useNavigate();
-  const [filter, setFilter] = useState<"all" | "active" | "completed">("all");
-  // loadTasks() already merges localStorage + DEFAULT_SEED_TASKS
+  const [filter, setFilter] = useState<"active" | "completed">("active");
   const [tasks, setTasks] = useState<Task[]>(() => loadTasks());
   const [showAddModal, setShowAddModal] = useState(false);
   const [newTaskText, setNewTaskText] = useState("");
   const [selectedContactId, setSelectedContactId] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [selectedType, setSelectedType] = useState<Task["type"]>("manual");
+  const [customTypeText, setCustomTypeText] = useState("");
 
   const toggleTask = (taskId: string) => {
     const task = tasks.find((t) => t.id === taskId);
@@ -87,127 +243,155 @@ export function Tasks() {
     const nextCompleted = !task.completed;
     updateTaskCompleted(taskId, nextCompleted);
     setTasks(loadTasks());
-
-    // Sync "message" tasks → Dashboard follow-up counter
     if (task.type === "message" && task.contactId) {
       try {
-        const sent: string[] = JSON.parse(localStorage.getItem("w52_followup_sent") || "[]");
+        const sent: string[] = JSON.parse(
+          localStorage.getItem("w52_followup_sent") || "[]"
+        );
         if (nextCompleted) {
-          if (!sent.includes(task.contactId)) {
-            localStorage.setItem("w52_followup_sent", JSON.stringify([...sent, task.contactId]));
-          }
+          if (!sent.includes(task.contactId))
+            localStorage.setItem(
+              "w52_followup_sent",
+              JSON.stringify([...sent, task.contactId])
+            );
         } else {
-          localStorage.setItem("w52_followup_sent", JSON.stringify(sent.filter((id) => id !== task.contactId)));
+          localStorage.setItem(
+            "w52_followup_sent",
+            JSON.stringify(sent.filter((id) => id !== task.contactId))
+          );
         }
       } catch {}
     }
   };
 
   const addTask = () => {
-    if (!newTaskText.trim() || !selectedContactId || !dueDate) return;
-    const selectedContact = allContacts(mockContacts).find((c) => c.id === selectedContactId);
-    if (!selectedContact) return;
+    if (!newTaskText.trim() || !dueDate) return;
+    const selectedContact = selectedContactId
+      ? allContacts(mockContacts).find((c) => c.id === selectedContactId)
+      : null;
+    const taskType = selectedType === "manual" && customTypeText.trim()
+      ? ("manual" as Task["type"])
+      : selectedType;
     const newTask: Task = {
       id: `task-${Date.now()}`,
-      contactId: selectedContactId,
-      contactName: selectedContact.user.name,
-      contactUsername: selectedContact.user.username,
+      contactId: selectedContact?.id || "",
+      contactName: selectedContact?.user.name || "",
+      contactUsername: selectedContact?.user.username,
       text: newTaskText.trim(),
       completed: false,
       dueDate,
-      type: selectedType,
+      type: taskType,
+      ...(selectedType === "manual" && customTypeText.trim()
+        ? { customLabel: customTypeText.trim() }
+        : {}),
     };
     addTaskStore(newTask);
     setTasks(loadTasks());
-    setNewTaskText(""); setSelectedContactId(""); setDueDate(""); setSelectedType("manual");
+    setNewTaskText("");
+    setSelectedContactId("");
+    setDueDate("");
+    setSelectedType("manual");
+    setCustomTypeText("");
     setShowAddModal(false);
   };
-
-  const filteredTasks = tasks.filter((t) => {
-    if (filter === "active") return !t.completed;
-    if (filter === "completed") return t.completed;
-    return true;
-  });
 
   const activeTasks = tasks.filter((t) => !t.completed);
   const completedTasks = tasks.filter((t) => t.completed);
 
+  const visibleActive = filter === "active" ? activeTasks : [];
+  const visibleCompleted = filter === "completed" ? completedTasks : [];
+
   return (
-    <div className="min-h-screen pb-8">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 pt-14 pb-4">
-        <div className="flex items-center gap-2">
-          <button onClick={() => navigate(-1)} style={{ color: "#007AFF" }}>
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <div>
-            <h1 style={{ fontSize: "28px", fontWeight: 700, color: "#0a1628", letterSpacing: "-0.4px" }}>Задачи</h1>
-            <p style={{ fontSize: "12px", color: "#8E8E93", marginTop: "1px" }}>
-              {activeTasks.length} активных · {completedTasks.length} завершено
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-95"
-          style={{ background: "#007AFF", boxShadow: "0 4px 12px rgba(0,122,255,0.3)" }}
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "var(--bg)",
+        color: "var(--ivory)",
+        position: "relative",
+        paddingBottom: 120,
+      }}
+    >
+      <Atmosphere intensity={0.25} />
+
+      <div style={{ position: "relative", zIndex: 1 }}>
+        <div
+          style={{
+            padding: "60px 22px 0",
+            display: "flex",
+            alignItems: "flex-end",
+            justifyContent: "space-between",
+          }}
         >
-          <Plus className="w-5 h-5 text-white" />
-        </button>
-      </div>
+          <Hero size={36}>Задачи</Hero>
+          <RoundBtn ivory onClick={() => setShowAddModal(true)} size={40}>
+            <svg width="16" height="16" viewBox="0 0 16 16">
+              <path
+                d="M8 2v12M2 8h12"
+                stroke="var(--abyss)"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+              />
+            </svg>
+          </RoundBtn>
+        </div>
 
-      {/* Filter pills */}
-      <div className="px-4 mb-4 flex gap-2">
-        {([["all", `Все (${tasks.length})`], ["active", `Активные (${activeTasks.length})`], ["completed", `Готово (${completedTasks.length})`]] as const).map(([val, label]) => (
-          <button
-            key={val}
-            onClick={() => setFilter(val)}
-            className="px-3 py-1.5 rounded-full text-xs font-medium transition-all"
-            style={filter === val
-              ? { background: "#007AFF", color: "#fff" }
-              : { background: "rgba(0,0,0,0.05)", color: "#3c3c43" }}
+        <div
+          style={{ display: "flex", gap: 6, padding: "18px 22px 0" }}
+          className="scrollbar-hide"
+        >
+          <Chip
+            label={`АКТИВНЫЕ · ${activeTasks.length}`}
+            active={filter === "active"}
+            onClick={() => setFilter("active")}
+          />
+          <Chip
+            label={`ГОТОВО · ${completedTasks.length}`}
+            active={filter === "completed"}
+            onClick={() => setFilter("completed")}
+          />
+        </div>
+
+        {(visibleActive.length > 0 || visibleCompleted.length > 0) && (
+          <div
+            style={{
+              padding: "16px 16px 0",
+              display: "flex",
+              flexDirection: "column",
+              gap: 10,
+            }}
           >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {/* Active Tasks */}
-      <div className="px-4 space-y-2.5">
-        <AnimatePresence initial={false}>
-          {filteredTasks.filter((t) => !t.completed).map((task, i) => (
-            <TaskCard key={task.id} task={task} i={i} onToggle={toggleTask} />
-          ))}
-        </AnimatePresence>
-      </div>
-
-      {/* Completed Tasks */}
-      {filteredTasks.some((t) => t.completed) && filter !== "active" && (
-        <div className="px-4 mt-4">
-          <p style={{ fontSize: "13px", fontWeight: 600, color: "#8E8E93", textTransform: "uppercase", letterSpacing: "0.4px", marginBottom: "10px" }}>
-            Завершено
-          </p>
-          <div className="space-y-2.5">
             <AnimatePresence initial={false}>
-              {filteredTasks.filter((t) => t.completed).map((task, i) => (
-                <TaskCard key={task.id} task={task} i={i} onToggle={toggleTask} />
+              {visibleActive.map((task) => (
+                <TaskCard key={task.id} task={task} onToggle={toggleTask} />
+              ))}
+              {visibleCompleted.map((task) => (
+                <TaskCard key={task.id} task={task} onToggle={toggleTask} />
               ))}
             </AnimatePresence>
           </div>
-        </div>
-      )}
+        )}
 
-      {filteredTasks.length === 0 && (
-        <div className="flex flex-col items-center justify-center h-[50vh] text-center p-8">
-          <div className="w-20 h-20 rounded-full flex items-center justify-center mb-4" style={{ background: "rgba(0,122,255,0.08)" }}>
-            <CheckSquare className="w-10 h-10" style={{ color: "#8E8E93" }} />
+        {tasks.length === 0 && (
+          <div
+            style={{
+              padding: "80px 22px",
+              textAlign: "center",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 10,
+            }}
+          >
+            <Hero size={22}>Нет задач</Hero>
+            <p
+              className="font-serif it text-muted-w"
+              style={{ fontSize: 14, lineHeight: 1.5, maxWidth: 280 }}
+            >
+              Они создаются автоматически при добавлении контакта или вручную.
+            </p>
           </div>
-          <p style={{ fontWeight: 600, color: "#0a1628", marginBottom: "8px" }}>Нет задач</p>
-          <p style={{ fontSize: "14px", color: "#8E8E93" }}>
-            {filter === "completed" ? "Завершённых задач пока нет" : "Добавьте задачу для контакта"}
-          </p>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Add Modal */}
       <AnimatePresence>
@@ -216,8 +400,17 @@ export function Tasks() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-end justify-center p-4"
-            style={{ background: "rgba(0,0,0,0.4)", backdropFilter: "blur(16px)" }}
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 50,
+              display: "flex",
+              alignItems: "flex-end",
+              justifyContent: "center",
+              padding: 16,
+              background: "rgba(0,0,0,0.55)",
+              backdropFilter: "blur(16px)",
+            }}
             onClick={() => setShowAddModal(false)}
           >
             <motion.div
@@ -225,100 +418,185 @@ export function Tasks() {
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 60, opacity: 0 }}
               transition={{ type: "spring", stiffness: 380, damping: 32 }}
-              className="glass-card p-6 w-full max-w-lg"
               onClick={(e) => e.stopPropagation()}
+              style={{
+                ...cardStyle,
+                background: "var(--surface)",
+                padding: 22,
+                width: "100%",
+                maxWidth: 520,
+              }}
             >
-              <div className="flex items-center justify-between mb-5">
-                <p style={{ fontWeight: 700, fontSize: "20px", color: "#0a1628" }}>Новая задача</p>
-                <button onClick={() => setShowAddModal(false)} className="p-1.5 rounded-full" style={{ background: "rgba(0,0,0,0.06)" }}>
-                  <X className="w-4 h-4" style={{ color: "#3c3c43" }} />
-                </button>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: 18,
+                }}
+              >
+                <Hero size={22}>Новая задача</Hero>
+                <RoundBtn onClick={() => setShowAddModal(false)} size={32}>
+                  <X className="w-3.5 h-3.5" />
+                </RoundBtn>
               </div>
 
-              <div className="space-y-3">
-                {/* Task type picker */}
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 14,
+                }}
+              >
+                {/* TYPE */}
                 <div>
-                  <label style={{ fontSize: "13px", fontWeight: 600, color: "#8E8E93", display: "block", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.4px" }}>
-                    Тип
+                  <label className="eyebrow" style={{ display: "block", marginBottom: 8 }}>
+                    ТИП
                   </label>
-                  <div className="flex flex-wrap gap-2">
-                    {(Object.entries(SYSTEM_BADGE) as [Task["type"], typeof SYSTEM_BADGE[string]][]).concat([["manual", { label: "Своя", color: "#3c3c43", bg: "rgba(0,0,0,0.06)", icon: null }]]).map(([type, cfg]) => (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {(
+                      [
+                        ...Object.entries(TASK_BADGE),
+                        ["manual", { label: "Своя", icon: null }],
+                        ["none", { label: "Без тега", icon: null }],
+                      ] as [Task["type"], { label: string; icon: React.ReactNode }][]
+                    ).map(([type, cfg]) => (
                       <button
                         key={type}
                         onClick={() => setSelectedType(type)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all"
-                        style={selectedType === type
-                          ? { background: cfg.color, color: "#fff", boxShadow: `0 2px 8px ${cfg.color}55` }
-                          : { background: cfg.bg, color: cfg.color }}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 5,
+                          padding: "6px 12px",
+                          borderRadius: 100,
+                          background: selectedType === type ? "var(--ivory)" : "transparent",
+                          color: selectedType === type ? "var(--abyss)" : "var(--muted-fg)",
+                          fontFamily: "var(--mono)",
+                          fontSize: 11,
+                          letterSpacing: "0.04em",
+                          textTransform: "uppercase",
+                          border: "1px solid " + (selectedType === type ? "var(--ivory)" : "var(--line-soft)"),
+                          cursor: "pointer",
+                        }}
                       >
-                        {cfg.icon}{cfg.label}
+                        {cfg.icon}
+                        {cfg.label}
                       </button>
                     ))}
                   </div>
+                  {selectedType === "manual" && (
+                    <input
+                      value={customTypeText}
+                      onChange={(e) => setCustomTypeText(e.target.value)}
+                      placeholder="Название типа…"
+                      style={{
+                        marginTop: 8,
+                        width: "100%",
+                        padding: "10px 14px",
+                        background: "var(--deep)",
+                        border: "1px solid var(--line-soft)",
+                        borderRadius: 12,
+                        color: "var(--ivory)",
+                        fontFamily: "var(--sans)",
+                        fontSize: 14,
+                        outline: "none",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                  )}
                 </div>
+
+                {/* CONTACT (optional) */}
                 <div>
-                  <label style={{ fontSize: "13px", fontWeight: 600, color: "#8E8E93", display: "block", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.4px" }}>
-                    Контакт
+                  <label className="eyebrow" style={{ display: "block", marginBottom: 8 }}>
+                    КОНТАКТ
                   </label>
                   <select
                     value={selectedContactId}
                     onChange={(e) => setSelectedContactId(e.target.value)}
-                    className="w-full px-4 py-3 text-sm"
+                    style={{
+                      width: "100%",
+                      padding: "12px 14px",
+                      background: "var(--deep)",
+                      border: "1px solid var(--line-soft)",
+                      borderRadius: 12,
+                      color: "var(--ivory)",
+                      fontFamily: "var(--sans)",
+                      fontSize: 14,
+                    }}
                   >
-                    <option value="">Выберите контакт</option>
+                    <option value="">Без контакта</option>
                     {allContacts(mockContacts).map((c) => (
-                      <option key={c.id} value={c.id}>{c.user.name}</option>
+                      <option key={c.id} value={c.id}>
+                        {c.user.name}
+                      </option>
                     ))}
                   </select>
                 </div>
+
+                {/* TASK TEXT */}
                 <div>
-                  <label style={{ fontSize: "13px", fontWeight: 600, color: "#8E8E93", display: "block", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.4px" }}>
-                    Задача
+                  <label className="eyebrow" style={{ display: "block", marginBottom: 8 }}>
+                    ЗАДАЧА
                   </label>
                   <textarea
                     value={newTaskText}
                     onChange={(e) => setNewTaskText(e.target.value)}
-                    placeholder="Например: Отправить коммерческое предложение"
+                    placeholder="Отправить коммерческое предложение"
                     rows={2}
-                    className="w-full px-4 py-3 text-sm resize-none"
+                    style={{
+                      width: "100%",
+                      padding: "12px 14px",
+                      background: "var(--deep)",
+                      border: "1px solid var(--line-soft)",
+                      borderRadius: 12,
+                      color: "var(--ivory)",
+                      fontFamily: "var(--sans)",
+                      fontSize: 14,
+                      resize: "none",
+                      outline: "none",
+                      boxSizing: "border-box",
+                    }}
                   />
                 </div>
+
+                {/* DUE DATE */}
                 <div>
-                  <label style={{ fontSize: "13px", fontWeight: 600, color: "#8E8E93", display: "block", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.4px" }}>
-                    Срок
+                  <label className="eyebrow" style={{ display: "block", marginBottom: 8 }}>
+                    СРОК
                   </label>
                   <input
                     type="date"
                     value={dueDate}
                     onChange={(e) => setDueDate(e.target.value)}
                     min={new Date().toISOString().split("T")[0]}
-                    className="w-full px-4 py-3 text-sm"
+                    style={{
+                      width: "100%",
+                      padding: "12px 14px",
+                      background: "var(--deep)",
+                      border: "1px solid var(--line-soft)",
+                      borderRadius: 12,
+                      color: "var(--ivory)",
+                      fontFamily: "var(--sans)",
+                      fontSize: 14,
+                      boxSizing: "border-box",
+                    }}
                   />
                 </div>
               </div>
 
-              <div className="flex gap-2.5 mt-5">
-                <button
+              <div style={{ marginTop: 20, display: "flex", gap: 10 }}>
+                <IvoryBtn
+                  h={48}
                   onClick={addTask}
-                  disabled={!newTaskText.trim() || !selectedContactId || !dueDate}
-                  className="flex-1 rounded-[14px] text-white font-semibold transition-all active:scale-97 disabled:opacity-40"
-                  style={{ background: "#007AFF", height: "50px", fontSize: "17px", boxShadow: "0 4px 15px rgba(0,122,255,0.3)" }}
+                  disabled={!newTaskText.trim() || !dueDate}
                 >
                   Создать
-                </button>
-                <button
-                  onClick={() => setShowAddModal(false)}
-                  className="px-5 rounded-[14px] font-semibold transition-all active:scale-97"
-                  style={{
-                    background: "rgba(255,255,255,0.72)",
-                    border: "0.5px solid rgba(0,0,0,0.1)",
-                    color: "#007AFF",
-                    height: "50px",
-                    fontSize: "17px",
-                  }}
-                >
+                </IvoryBtn>
+                <GhostBtn h={48} full={false} onClick={() => setShowAddModal(false)}>
                   Отмена
-                </button>
+                </GhostBtn>
               </div>
             </motion.div>
           </motion.div>

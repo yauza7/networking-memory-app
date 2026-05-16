@@ -28,7 +28,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Build multipart/form-data manually using FormData
   const form = new FormData();
   form.append("chat_id", chatId);
-  form.append("caption", `📊 Контакты W·52 · ${new Date().toLocaleDateString("ru-RU")}`);
+  form.append("caption", `📊 Контакты Echo · ${new Date().toLocaleDateString("ru-RU")}`);
   form.append("parse_mode", "HTML");
 
   const csvWithBom = "﻿" + csv;

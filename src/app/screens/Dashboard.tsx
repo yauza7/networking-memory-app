@@ -1,26 +1,39 @@
+/**
+ * W·52 — Главная (Dashboard)
+ * Чистый top, без coord-line и значка кита.
+ * Hero — конкретное AI-предложение по реальному контакту (follow-up).
+ */
 import { useState } from "react";
 import { Link } from "react-router";
-import { motion } from "motion/react";
-import {
-  Bell, ArrowRight, Sparkles, MessageCircle, Clock,
-  QrCode, CheckSquare, Copy, Check,
-} from "lucide-react";
-import { mockContacts } from "../utils/mockData";
-import { allContacts } from "../utils/contactStore";
-import { loadCurrentUser, getQRValue, getProfileUrl } from "../utils/userStore";
-import { loadTasks } from "../utils/taskStore";
+import { motion, AnimatePresence } from "motion/react";
+import { Bell, MessageCircle, Plus, X } from "lucide-react";
+import { mockContacts, type Connection } from "../utils/mockData";
+import { allContacts, addStoredContact } from "../utils/contactStore";
+import { loadCurrentUser } from "../utils/userStore";
+import { loadTasks, updateTaskCompleted } from "../utils/taskStore";
 import { unreadCount } from "../utils/notificationStore";
+import {
+  getActiveSuggestions,
+  dismissSuggestion,
+  markSuggestionAdded,
+  type SuggestedContact,
+} from "../utils/suggestedContacts";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
-import { QRCodeSVG } from "qrcode.react";
+import {
+  Atmosphere,
+  Avatar,
+  SectionLabel,
+  AISparkle,
+  Hero,
+  cardStyle,
+} from "../components/brand/Brand";
 
 export function Dashboard() {
-  const [linkCopied, setLinkCopied] = useState(false);
   const currentUser = loadCurrentUser();
-
   const contacts = allContacts(mockContacts);
+  const [tasksVersion, setTasksVersion] = useState(0);
 
-  // Merge static followUpSent with tasks completed in Tasks screen
   const completedFollowUpIds = new Set<string>(
     JSON.parse(localStorage.getItem("w52_followup_sent") || "[]")
   );
@@ -34,252 +47,684 @@ export function Dashboard() {
     .sort((a, b) => new Date(b.metAt).getTime() - new Date(a.metAt).getTime())
     .slice(0, 3);
 
-  const weekCount = mockContacts.filter(
-    (c) => new Date(c.metAt) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-  ).length;
-  const followUpCount = mockContacts.filter((c) => c.followUpSent).length;
-
-  const profileUrl = getProfileUrl(currentUser.username);
-
-  // Live task count from localStorage
   const allTasks = loadTasks();
+  void tasksVersion;
   const activeTasks = allTasks.filter((t) => !t.completed);
-
-  // Notification unread count from real notification store
   const unreadNotifications = unreadCount();
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(profileUrl).then(() => {
-      setLinkCopied(true);
-      setTimeout(() => setLinkCopied(false), 2000);
-    });
+  const toggleDashTask = (taskId: string, currentlyCompleted: boolean) => {
+    updateTaskCompleted(taskId, !currentlyCompleted);
+    setTasksVersion((v) => v + 1);
   };
 
+  // ── "Вы можете их знать" suggestions ────────────────────
+  const [suggestions, setSuggestions] = useState<SuggestedContact[]>(() => getActiveSuggestions());
+
+  const addSuggestionToContacts = (s: SuggestedContact) => {
+    const contactId = `c-${Date.now()}-${s.username}`;
+    const newContact: Connection = {
+      id: contactId,
+      user: {
+        id: `u-${Date.now()}`,
+        name: s.name,
+        username: s.username,
+        role: s.role,
+        company: s.company,
+        tags: s.tags,
+        bio: s.description,
+        links: [{ type: "telegram", url: `https://t.me/${s.username}` }],
+      },
+      metAt: new Date().toISOString(),
+      event: "Подсказка Echo",
+      aiSummary: s.description,
+      followUpSent: false,
+    };
+    addStoredContact(newContact);
+    markSuggestionAdded(s.id);
+    setSuggestions(getActiveSuggestions());
+  };
+
+  const dismissSuggestionCard = (id: string) => {
+    dismissSuggestion(id);
+    setSuggestions(getActiveSuggestions());
+  };
+
+  const firstName = currentUser.name.split(" ")[0] || "друг";
+
+  // ── Pick the most-relevant AI suggestion from real data ────────
+  // Priority: oldest pending follow-up > most-recent contact without AI summary
+  type Suggestion = {
+    contact: (typeof contacts)[number];
+    headline: string;
+    detail: string;
+    cta: string;
+  } | null;
+
+  let suggestion: Suggestion = null;
+  if (pendingFollowUps.length > 0) {
+    const oldest = [...pendingFollowUps].sort(
+      (a, b) => new Date(a.metAt).getTime() - new Date(b.metAt).getTime()
+    )[0];
+    const daysAgo = Math.floor(
+      (Date.now() - new Date(oldest.metAt).getTime()) / 86400000
+    );
+    const fname = oldest.user.name.split(" ")[0];
+    suggestion = {
+      contact: oldest,
+      headline: `Напиши ${fname}`,
+      detail: oldest.aiSummary
+        ? `${daysAgo} дн. без ответа. Помнишь: ${oldest.aiSummary.toLowerCase()}`
+        : `${daysAgo} дн. без ответа. ${
+            oldest.event ? `Встреча — ${oldest.event}.` : "Не теряй связь."
+          }`,
+      cta: oldest.user.username ? "Написать" : "Открыть",
+    };
+  } else if (recentContacts[0]) {
+    const last = recentContacts[0];
+    const fname = last.user.name.split(" ")[0];
+    suggestion = {
+      contact: last,
+      headline: `Добавь заметку к ${fname}`,
+      detail: last.event
+        ? `Свежий контакт с ${last.event}. Запиши, о чём говорили — это самое важное.`
+        : `Свежий контакт. Запиши контекст встречи, пока помнишь.`,
+      cta: "Заметка",
+    };
+  }
+
+  const ctaHref = suggestion
+    ? suggestion.cta === "Написать" && suggestion.contact.user.username
+      ? `https://t.me/${suggestion.contact.user.username}`
+      : suggestion.cta === "Заметка"
+      ? `/add-note?contact=${suggestion.contact.id}`
+      : `/contact/${suggestion.contact.id}`
+    : "#";
+  const ctaIsExternal = suggestion?.cta === "Написать";
+
   return (
-    <div className="min-h-screen pb-20">
-      {/* Title row */}
-      <div className="flex items-start justify-between px-5 pt-14 pb-2">
-        <div>
-          <h1
-            style={{
-              fontSize: "34px", fontWeight: 700, color: "#0a1628",
-              letterSpacing: "-0.5px", lineHeight: 1.1,
-            }}
-          >
-            W·52
-          </h1>
-          <p style={{ fontSize: "15px", color: "#8E8E93", marginTop: "3px" }}>
-            Привет, {currentUser.name.split(" ")[0]}!
-          </p>
-        </div>
-        <Link
-          to="/notifications"
-          className="relative mt-1"
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "var(--bg)",
+        color: "var(--ivory)",
+        position: "relative",
+        paddingBottom: 120,
+      }}
+    >
+      <Atmosphere intensity={0.35} />
+
+      <div style={{ position: "relative", zIndex: 1 }}>
+        {/* Top bar: greeting + notification bell */}
+        <div
           style={{
-            padding: "8px", borderRadius: "50%",
-            background: "rgba(255,255,255,0.72)",
-            border: "0.5px solid rgba(0,0,0,0.08)",
+            padding: "60px 22px 0",
+            display: "flex",
+            alignItems: "flex-end",
+            justifyContent: "space-between",
           }}
         >
-          <Bell className="w-5 h-5" style={{ color: "#0a1628" }} />
-          {unreadNotifications > 0 && (
-            <span
-              className="absolute -top-1 -right-1 w-5 h-5 text-white flex items-center justify-center rounded-full font-bold"
-              style={{ background: "#FF3B30", fontSize: "11px" }}
-            >
-              {unreadNotifications}
-            </span>
-          )}
-        </Link>
-      </div>
+          <Hero size={36}>
+            Привет,
+            <br />
+            <span className="it text-muted-w">{firstName}.</span>
+          </Hero>
 
-      {/* QR Card */}
-      <div className="px-4 mb-4">
-        <motion.div
-          className="glass-card overflow-hidden"
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1, duration: 0.4 }}
-        >
-          <div className="px-5 pt-4 pb-3">
-            <p style={{ fontWeight: 600, color: "#0a1628", fontSize: "15px" }}>Мой QR-код</p>
-            <p style={{ fontSize: "13px", color: "#8E8E93", marginTop: "2px" }}>
-              Покажите для обмена визитками
-            </p>
-          </div>
-          <div className="flex items-center justify-center py-5 mx-4 mb-3">
-            <div
-              className="overflow-hidden"
-              style={{ borderRadius: 20, padding: 12, background: "white", boxShadow: "0 4px 20px rgba(0,80,180,0.10)" }}
-            >
-              <QRCodeSVG
-                value={getQRValue(currentUser)}
-                size={180}
-                level="H"
-                fgColor="#007AFF"
-                bgColor="white"
-              />
-            </div>
-          </div>
-          <div className="px-4 pb-4 grid grid-cols-2 gap-2.5">
-            <button
-              onClick={handleCopyLink}
-              className="py-3 rounded-[14px] text-sm font-semibold flex items-center justify-center gap-1.5 transition-all active:scale-97"
-              style={{
-                background: "rgba(0,122,255,0.08)",
-                border: "0.5px solid rgba(0,122,255,0.15)",
-                color: "#007AFF",
-              }}
-            >
-              {linkCopied
-                ? <><Check className="w-4 h-4" /> Скопировано</>
-                : <><Copy className="w-4 h-4" /> Ссылка</>}
-            </button>
-            <Link
-              to="/my-card"
-              className="flex items-center justify-center gap-2 py-3 rounded-[14px] text-sm font-semibold text-white transition-all active:scale-97"
-              style={{
-                background: "linear-gradient(180deg, #3AA3FF 0%, #007AFF 50%, #0063D1 100%)",
-                boxShadow: "0 4px 16px rgba(0,122,255,0.45), inset 0 1px 0 rgba(255,255,255,0.28)",
-              }}
-            >
-              Профиль <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-        </motion.div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="px-4 mb-4 grid grid-cols-2 gap-3">
-        {[
-          { to: "/tasks", Icon: CheckSquare, title: "Задачи", sub: `${activeTasks.length} активных` },
-          { to: "/scan", Icon: QrCode, title: "Скан", sub: "Добавить контакт" },
-        ].map(({ to, Icon, title, sub }, i) => (
-          <motion.div
-            key={to}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 + i * 0.05 }}
+          <Link
+            to="/notifications"
+            style={{
+              position: "relative",
+              width: 42,
+              height: 42,
+              borderRadius: "50%",
+              background: "var(--surface)",
+              border: "1px solid var(--line-soft)",
+              color: "var(--ivory)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              textDecoration: "none",
+              flexShrink: 0,
+            }}
           >
-            <Link to={to} className="glass-card flex items-center gap-3 p-4">
-              <div className="p-2.5 rounded-xl" style={{ background: "rgba(0,122,255,0.1)" }}>
-                <Icon className="w-5 h-5" style={{ color: "#007AFF" }} />
-              </div>
-              <div>
-                <p style={{ fontWeight: 600, fontSize: "14px", color: "#0a1628" }}>{title}</p>
-                <p style={{ fontSize: "12px", color: "#8E8E93" }}>{sub}</p>
-              </div>
-            </Link>
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Follow-up Alerts */}
-      {pendingFollowUps.length > 0 && (
-        <motion.div
-          className="px-4 mb-4"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25 }}
-        >
-          <div className="glass-card p-4" style={{ borderColor: "rgba(255,59,48,0.18)" }}>
-            <Link to="/tasks" className="flex items-center gap-3 mb-3">
-              <div className="p-2 rounded-xl" style={{ background: "rgba(255,59,48,0.1)" }}>
-                <Clock className="w-4 h-4" style={{ color: "#FF3B30" }} />
-              </div>
-              <div className="flex-1">
-                <p style={{ fontWeight: 600, fontSize: "14px", color: "#0a1628" }}>Нужно написать</p>
-                <p style={{ fontSize: "12px", color: "#8E8E93", marginTop: "1px" }}>
-                  {pendingFollowUps.length} {pendingFollowUps.length === 1 ? "контакт ждёт" : "контакта ждут"}
-                </p>
-              </div>
-              <ArrowRight className="w-4 h-4" style={{ color: "#8E8E93" }} />
-            </Link>
-            <div className="space-y-2">
-              {pendingFollowUps.slice(0, 2).map((contact) => (
-                <div
-                  key={contact.id}
-                  className="flex items-center justify-between p-3 rounded-xl"
-                  style={{ background: "rgba(255,255,255,0.55)", border: "0.5px solid rgba(255,59,48,0.08)" }}
-                >
-                  <Link to={`/contact/${contact.id}`} className="flex-1">
-                    <p style={{ fontWeight: 500, fontSize: "14px", color: "#0a1628" }}>{contact.user.name}</p>
-                    <p style={{ fontSize: "12px", color: "#8E8E93" }}>
-                      {contact.user.role} · {formatDistanceToNow(new Date(contact.metAt), { addSuffix: true, locale: ru })}
-                    </p>
-                  </Link>
-                  {contact.user.username && (
-                    <a
-                      href={`https://t.me/${contact.user.username}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-2 rounded-xl text-white transition-all active:scale-95"
-                      style={{ background: "#007AFF" }}
-                    >
-                      <MessageCircle className="w-4 h-4" />
-                    </a>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </motion.div>
-      )}
-
-      {/* Recent Contacts */}
-      <div className="px-4">
-        <div className="flex items-center justify-between mb-3">
-          <p style={{ fontWeight: 600, fontSize: "17px", color: "#0a1628" }}>Недавние</p>
-          <Link to="/contacts" className="flex items-center gap-1 font-medium text-sm" style={{ color: "#007AFF" }}>
-            Все <ArrowRight className="w-3 h-3" />
+            <Bell className="w-[18px] h-[18px]" />
+            {unreadNotifications > 0 && (
+              <span
+                style={{
+                  position: "absolute",
+                  top: -3,
+                  right: -3,
+                  minWidth: 18,
+                  height: 18,
+                  padding: "0 5px",
+                  borderRadius: 9,
+                  background: "var(--amber)",
+                  color: "var(--abyss)",
+                  fontSize: 10,
+                  fontWeight: 600,
+                  fontFamily: "var(--mono)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {unreadNotifications}
+              </span>
+            )}
           </Link>
         </div>
-        <div className="space-y-2">
-          {recentContacts.map((contact, i) => (
-            <motion.div
-              key={contact.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 + i * 0.05 }}
-            >
-              <Link to={`/contact/${contact.id}`} className="glass-card flex items-start gap-3 p-4 block">
-                {contact.user.photo ? (
-                  <img
-                    src={contact.user.photo}
-                    alt={contact.user.name}
-                    className="w-11 h-11 rounded-full object-cover flex-shrink-0 avatar-ocean"
-                  />
-                ) : (
-                  <div
-                    className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 avatar-ocean"
-                    style={{ background: "linear-gradient(135deg, #5AC8FA, #007AFF)", fontSize: "16px" }}
-                  >
-                    {contact.user.name[0]}
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between mb-0.5">
-                    <p style={{ fontWeight: 600, fontSize: "14px", color: "#0a1628" }}>{contact.user.name}</p>
-                    <span style={{ fontSize: "12px", color: "#8E8E93" }}>
-                      {formatDistanceToNow(new Date(contact.metAt), { locale: ru })}
-                    </span>
-                  </div>
-                  <p style={{ fontSize: "12px", color: "#8E8E93", marginBottom: "6px" }}>{contact.user.role}</p>
-                  {contact.aiSummary && (
-                    <div className="flex items-start gap-1.5 p-2 rounded-xl" style={{ background: "rgba(0,122,255,0.06)" }}>
-                      <Sparkles className="w-3 h-3 flex-shrink-0 mt-0.5" style={{ color: "#007AFF" }} />
-                      <p style={{ fontSize: "12px", color: "#007AFF" }} className="line-clamp-2">
-                        {contact.aiSummary}
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </Link>
-            </motion.div>
-          ))}
-        </div>
-      </div>
 
+        {/* AI suggestion hero */}
+        {suggestion && (
+          <div style={{ padding: "20px 16px 0" }}>
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, duration: 0.4 }}
+              style={{
+                ...cardStyle,
+                padding: "18px 18px 18px",
+                background:
+                  "linear-gradient(180deg, oklch(0.24 0.05 210), oklch(0.19 0.04 230))",
+                position: "relative",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  marginBottom: 14,
+                }}
+              >
+                <div
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: "50%",
+                    background: "oklch(0.86 0.13 195 / 0.18)",
+                    border: "1px solid var(--signal-dim)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <AISparkle size={10} />
+                </div>
+                <span className="eyebrow" style={{ color: "var(--signal)" }}>
+                  AI · ПОДСКАЗКА
+                </span>
+              </div>
+
+              <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+                <Avatar
+                  name={suggestion.contact.user.name}
+                  photo={suggestion.contact.user.photo}
+                  username={suggestion.contact.user.username}
+                  size={56}
+                  ring
+                />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <Hero size={22}>
+                    {suggestion.headline}
+                  </Hero>
+                  <p
+                    style={{
+                      fontFamily: "var(--sans)",
+                      fontSize: 13.5,
+                      lineHeight: 1.5,
+                      margin: "8px 0 0",
+                      color: "var(--warm)",
+                    }}
+                  >
+                    {suggestion.detail}
+                  </p>
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
+                {ctaIsExternal ? (
+                  <a
+                    href={ctaHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={ctaPrimaryStyle}
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    {suggestion.cta}
+                  </a>
+                ) : (
+                  <Link to={ctaHref} style={ctaPrimaryStyle}>
+                    {suggestion.cta}
+                  </Link>
+                )}
+                <Link
+                  to={`/contact/${suggestion.contact.id}`}
+                  style={ctaGhostStyle}
+                >
+                  Открыть карточку
+                </Link>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        {/* Recent */}
+        <div style={{ marginTop: 26 }}>
+          <SectionLabel
+            right={
+              <Link to="/contacts" style={{ color: "inherit", textDecoration: "none" }}>
+                ВСЕ →
+              </Link>
+            }
+          >
+            Недавние
+          </SectionLabel>
+          <div
+            style={{
+              padding: "0 16px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+            }}
+          >
+            {recentContacts.length === 0 ? (
+              <div style={{ ...cardStyle, padding: "20px 16px", textAlign: "center" }}>
+                <p className="font-serif it text-muted-w" style={{ fontSize: 15, margin: 0 }}>
+                  Пока никого. Сканируй QR на встрече.
+                </p>
+              </div>
+            ) : (
+              recentContacts.map((c, i) => (
+                <motion.div
+                  key={c.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.15 + i * 0.05 }}
+                >
+                  <Link
+                    to={`/contact/${c.id}`}
+                    style={{ textDecoration: "none", color: "inherit" }}
+                  >
+                    <div
+                      style={{
+                        ...cardStyle,
+                        padding: "12px 14px",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 12,
+                      }}
+                    >
+                      <Avatar name={c.user.name} photo={c.user.photo} username={c.user.username} size={46} ring={false} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div
+                          style={{
+                            fontFamily: "var(--sans)",
+                            fontWeight: 500,
+                            fontSize: 16,
+                            letterSpacing: "-0.01em",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          {c.user.name}
+                        </div>
+                        {(c.user.role || c.user.company) && (
+                          <div
+                            className="text-muted-w"
+                            style={{
+                              fontSize: 12.5,
+                              marginTop: 2,
+                              whiteSpace: "nowrap",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {c.user.role}
+                            {c.user.company && ` · ${c.user.company}`}
+                          </div>
+                        )}
+                        {c.user.tags.length > 0 && (
+                          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
+                            {c.user.tags.slice(0, 3).map((tag, idx) => (
+                              <span
+                                key={idx}
+                                style={{
+                                  padding: "2px 7px",
+                                  borderRadius: 100,
+                                  background: "oklch(0.86 0.13 195 / 0.10)",
+                                  border: "1px solid oklch(0.62 0.105 195 / 0.25)",
+                                  color: "var(--signal)",
+                                  fontFamily: "var(--mono)",
+                                  fontSize: 9.5,
+                                  letterSpacing: "0.04em",
+                                }}
+                              >
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {!c.followUpSent && !completedFollowUpIds.has(c.id) && (
+                        <div
+                          style={{
+                            width: 7,
+                            height: 7,
+                            borderRadius: "50%",
+                            background: "var(--amber)",
+                          }}
+                        />
+                      )}
+                    </div>
+                  </Link>
+                </motion.div>
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* "Вы можете их знать" — Spotify-style suggestions */}
+        {suggestions.length > 0 && (
+          <div style={{ marginTop: 26 }}>
+            <SectionLabel>Вы можете их знать</SectionLabel>
+            <div
+              className="scrollbar-hide"
+              style={{
+                display: "flex",
+                gap: 12,
+                padding: "0 16px",
+                overflowX: "auto",
+                scrollSnapType: "x mandatory",
+                paddingBottom: 4,
+              }}
+            >
+              <AnimatePresence initial={false}>
+                {suggestions.map((s) => (
+                  <motion.div
+                    key={s.id}
+                    layout
+                    initial={{ opacity: 0, scale: 0.96 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
+                    style={{
+                      ...cardStyle,
+                      flex: "0 0 240px",
+                      padding: "14px 14px 12px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 10,
+                      scrollSnapAlign: "start",
+                      position: "relative",
+                    }}
+                  >
+                    {/* Dismiss button */}
+                    <button
+                      onClick={() => dismissSuggestionCard(s.id)}
+                      style={{
+                        position: "absolute",
+                        top: 8,
+                        right: 8,
+                        width: 22,
+                        height: 22,
+                        borderRadius: "50%",
+                        background: "transparent",
+                        border: "1px solid var(--line-soft)",
+                        color: "var(--faint)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "pointer",
+                        padding: 0,
+                      }}
+                      aria-label="Скрыть"
+                    >
+                      <X className="w-2.5 h-2.5" />
+                    </button>
+
+                    {/* Avatar + name */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <Avatar
+                        name={s.name}
+                        username={s.username}
+                        size={42}
+                        ring={false}
+                      />
+                      <div style={{ flex: 1, minWidth: 0, paddingRight: 22 }}>
+                        <div
+                          style={{
+                            fontFamily: "var(--sans)",
+                            fontWeight: 500,
+                            fontSize: 14,
+                            color: "var(--ivory)",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          {s.name}
+                        </div>
+                        <div
+                          className="font-mono"
+                          style={{
+                            fontSize: 10,
+                            color: "var(--signal-dim)",
+                            letterSpacing: "0.04em",
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                          }}
+                        >
+                          @{s.username}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Role · Company */}
+                    <div
+                      className="text-muted-w"
+                      style={{
+                        fontFamily: "var(--sans)",
+                        fontSize: 12,
+                        lineHeight: 1.3,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}
+                    >
+                      {s.role} · {s.company}
+                    </div>
+
+                    {/* Description */}
+                    <p
+                      style={{
+                        fontFamily: "var(--sans)",
+                        fontSize: 12,
+                        lineHeight: 1.4,
+                        color: "var(--muted-fg)",
+                        margin: 0,
+                        display: "-webkit-box",
+                        WebkitLineClamp: 3,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {s.description}
+                    </p>
+
+                    {/* Tags */}
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                      {s.tags.slice(0, 4).map((tag) => (
+                        <span
+                          key={tag}
+                          style={{
+                            padding: "2px 7px",
+                            borderRadius: 100,
+                            background: "oklch(0.86 0.13 195 / 0.10)",
+                            border: "1px solid oklch(0.62 0.105 195 / 0.25)",
+                            color: "var(--signal)",
+                            fontFamily: "var(--mono)",
+                            fontSize: 9.5,
+                            letterSpacing: "0.04em",
+                          }}
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+
+                    {/* Add button */}
+                    <button
+                      onClick={() => addSuggestionToContacts(s)}
+                      style={{
+                        marginTop: 4,
+                        height: 36,
+                        borderRadius: 10,
+                        background: "var(--signal)",
+                        color: "var(--abyss)",
+                        border: "none",
+                        fontFamily: "var(--sans)",
+                        fontSize: 12,
+                        fontWeight: 500,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 6,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      В контакты
+                    </button>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          </div>
+        )}
+
+        {/* Tasks preview */}
+        {activeTasks.length > 0 && (
+          <div style={{ marginTop: 26 }}>
+            <SectionLabel
+              right={
+                <Link to="/tasks" style={{ color: "inherit", textDecoration: "none" }}>
+                  ВСЕ →
+                </Link>
+              }
+            >
+              Задачи
+            </SectionLabel>
+            <div
+              style={{
+                padding: "0 16px",
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+              }}
+            >
+              <AnimatePresence initial={false}>
+              {activeTasks.slice(0, 3).map((task) => {
+                const overdue = task.dueDate && new Date(task.dueDate) < new Date();
+                const due = task.dueDate
+                  ? overdue
+                    ? "ПРОСРОЧЕНО"
+                    : formatDistanceToNow(new Date(task.dueDate), { locale: ru }).toUpperCase()
+                  : "БЕЗ СРОКА";
+                return (
+                  <motion.div
+                    key={task.id}
+                    layout
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, x: 40, transition: { duration: 0.25 } }}
+                    style={{
+                      ...cardStyle,
+                      padding: "12px 14px",
+                      display: "flex",
+                      gap: 12,
+                      alignItems: "center",
+                    }}
+                  >
+                    <button
+                      onClick={() => toggleDashTask(task.id, task.completed)}
+                      style={{
+                        width: 22,
+                        height: 22,
+                        borderRadius: 7,
+                        border: `1.6px solid ${overdue ? "var(--amber)" : "var(--line)"}`,
+                        background: "transparent",
+                        flexShrink: 0,
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        padding: 0,
+                      }}
+                      aria-label="Отметить как готово"
+                    />
+                    <Link
+                      to={task.contactId ? `/contact/${task.contactId}` : "/tasks"}
+                      style={{ flex: 1, minWidth: 0, textDecoration: "none", color: "inherit" }}
+                    >
+                      <div style={{ fontFamily: "var(--sans)", fontSize: 14, lineHeight: 1.3 }}>
+                        {task.text}
+                      </div>
+                    </Link>
+                    <span
+                      className="font-mono"
+                      style={{
+                        fontSize: 10,
+                        color: overdue ? "var(--amber)" : "var(--faint)",
+                        letterSpacing: "0.12em",
+                        textTransform: "uppercase",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {due}
+                    </span>
+                  </motion.div>
+                );
+              })}
+              </AnimatePresence>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
+
+const ctaPrimaryStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 6,
+  height: 38,
+  padding: "0 16px",
+  borderRadius: 12,
+  background: "var(--signal)",
+  color: "var(--abyss)",
+  fontFamily: "var(--sans)",
+  fontSize: 13,
+  fontWeight: 500,
+  textDecoration: "none",
+  boxShadow: "0 4px 18px oklch(0.86 0.13 195 / 0.25)",
+};
+
+const ctaGhostStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  height: 38,
+  padding: "0 14px",
+  borderRadius: 12,
+  background: "transparent",
+  color: "var(--muted-fg)",
+  border: "1px solid var(--line-soft)",
+  fontFamily: "var(--sans)",
+  fontSize: 13,
+  textDecoration: "none",
+};
+

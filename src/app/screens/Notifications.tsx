@@ -1,6 +1,10 @@
+/**
+ * W·52 — Уведомления (Notifications)
+ * Moody. Список карточек с типовой иконкой, цветным акцентом по типу, индикатор unread.
+ */
 import { useState, useCallback } from "react";
 import { useNavigate } from "react-router";
-import { ArrowLeft, UserPlus, MessageCircle, Bell } from "lucide-react";
+import { UserPlus, MessageCircle, Bell } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { motion } from "motion/react";
@@ -10,11 +14,20 @@ import {
   saveReadIds,
   type AppNotification,
 } from "../utils/notificationStore";
+import {
+  Atmosphere,
+  Hero,
+  RoundBtn,
+  cardStyle,
+} from "../components/brand/Brand";
 
-const TYPE_CONFIG = {
-  contact_added: { icon: UserPlus,      bg: "rgba(0,122,255,0.1)", color: "#007AFF" },
-  message:       { icon: MessageCircle, bg: "rgba(52,199,89,0.1)", color: "#34C759" },
-  reminder:      { icon: Bell,          bg: "rgba(255,149,0,0.1)", color: "#FF9500" },
+const TYPE_CONFIG: Record<
+  AppNotification["type"],
+  { Icon: typeof UserPlus; tint: string; tintDim: string }
+> = {
+  contact_added: { Icon: UserPlus,      tint: "var(--signal)", tintDim: "oklch(0.86 0.13 195 / 0.18)" },
+  message:       { Icon: MessageCircle, tint: "var(--signal)", tintDim: "oklch(0.86 0.13 195 / 0.14)" },
+  reminder:      { Icon: Bell,          tint: "var(--amber)",  tintDim: "oklch(0.80 0.110 65 / 0.18)" },
 };
 
 export function Notifications() {
@@ -44,85 +57,194 @@ export function Notifications() {
   }, [items]);
 
   return (
-    <div className="min-h-screen pb-8">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 pt-14 pb-4">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => navigate(-1)}
-            style={{ color: "#007AFF", fontSize: "17px" }}
-            className="flex items-center gap-1 font-medium"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </button>
-          <h1 style={{ fontSize: "28px", fontWeight: 700, color: "#0a1628", letterSpacing: "-0.4px" }}>
-            Уведомления
-          </h1>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "var(--bg)",
+        color: "var(--ivory)",
+        position: "relative",
+        paddingBottom: 120,
+      }}
+    >
+      <Atmosphere intensity={0.3} />
+
+      <div style={{ position: "relative", zIndex: 1 }}>
+        {/* Top */}
+        <div
+          style={{
+            padding: "56px 18px 0",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+          }}
+        >
+          <RoundBtn onClick={() => navigate(-1)}>
+            <svg width="10" height="14" viewBox="0 0 10 14">
+              <path d="M8 1L2 7l6 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            </svg>
+          </RoundBtn>
+          {unread > 0 && (
+            <button
+              onClick={markAllAsRead}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "var(--signal)",
+                fontFamily: "var(--mono)",
+                fontSize: 11,
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+                cursor: "pointer",
+              }}
+            >
+              Прочитать все
+            </button>
+          )}
         </div>
-        {unread > 0 && (
-          <button onClick={markAllAsRead} className="text-sm font-medium" style={{ color: "#007AFF" }}>
-            Прочитать все
-          </button>
+
+        {/* Title */}
+        <div style={{ padding: "16px 22px 0", display: "flex", alignItems: "baseline", gap: 10 }}>
+          <Hero size={32}>Уведомления</Hero>
+          {unread > 0 && (
+            <span
+              className="font-mono"
+              style={{
+                fontSize: 11,
+                color: "var(--signal-dim)",
+                letterSpacing: "0.14em",
+                textTransform: "uppercase",
+              }}
+            >
+              {unread} новых
+            </span>
+          )}
+        </div>
+
+        {notifications.length > 0 ? (
+          <div style={{ padding: "20px 16px 0", display: "flex", flexDirection: "column", gap: 10 }}>
+            {notifications.map((n, i) => {
+              const cfg = TYPE_CONFIG[n.type] || TYPE_CONFIG.reminder;
+              const Icon = cfg.Icon;
+              return (
+                <motion.div
+                  key={n.id}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: n.read ? 0.55 : 1, y: 0 }}
+                  transition={{ delay: i * 0.04 }}
+                  onClick={() => !n.read && markAsRead(n.id)}
+                  style={{
+                    ...cardStyle,
+                    padding: "14px 16px",
+                    cursor: n.read ? "default" : "pointer",
+                    border: n.read ? "1px solid var(--line-soft)" : "1px solid var(--signal-dim)",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                    <div
+                      style={{
+                        width: 38,
+                        height: 38,
+                        borderRadius: 12,
+                        background: cfg.tintDim,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexShrink: 0,
+                      }}
+                    >
+                      <Icon className="w-4 h-4" style={{ color: cfg.tint }} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8 }}>
+                        <p
+                          style={{
+                            fontFamily: "var(--sans)",
+                            fontWeight: 500,
+                            fontSize: 14,
+                            color: "var(--ivory)",
+                            margin: 0,
+                          }}
+                        >
+                          {n.title}
+                        </p>
+                        {!n.read && (
+                          <div
+                            style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: "50%",
+                              background: cfg.tint,
+                              flexShrink: 0,
+                              marginTop: 5,
+                            }}
+                          />
+                        )}
+                      </div>
+                      <p
+                        style={{
+                          fontFamily: "var(--sans)",
+                          fontSize: 13,
+                          color: "var(--muted-fg)",
+                          margin: "4px 0 0",
+                          lineHeight: 1.45,
+                        }}
+                      >
+                        {n.message}
+                      </p>
+                      <p
+                        className="font-mono"
+                        style={{
+                          fontSize: 10,
+                          color: "var(--faint)",
+                          marginTop: 6,
+                          letterSpacing: "0.12em",
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        {formatDistanceToNow(new Date(n.timestamp), { addSuffix: true, locale: ru })}
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        ) : (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "80px 30px",
+              textAlign: "center",
+              gap: 14,
+            }}
+          >
+            <div
+              style={{
+                width: 72,
+                height: 72,
+                borderRadius: "50%",
+                background: "oklch(0.86 0.13 195 / 0.10)",
+                border: "1px solid var(--signal-dim)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Bell className="w-7 h-7" style={{ color: "var(--signal-dim)" }} />
+            </div>
+            <Hero size={22}>Тихо в эфире</Hero>
+            <p
+              className="font-serif it text-muted-w"
+              style={{ fontSize: 14, lineHeight: 1.5, maxWidth: 260 }}
+            >
+              Здесь появятся важные обновления — новые контакты, ответы, напоминания.
+            </p>
+          </div>
         )}
       </div>
-
-      {/* List */}
-      {notifications.length > 0 ? (
-        <div className="px-4 space-y-2.5">
-          {notifications.map((n, i) => {
-            const cfg = TYPE_CONFIG[n.type];
-            const Icon = cfg.icon;
-            return (
-              <motion.div
-                key={n.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-                onClick={() => !n.read && markAsRead(n.id)}
-                className="glass-card p-4 cursor-pointer transition-all active:scale-[0.99]"
-                style={!n.read ? { borderColor: "rgba(0,122,255,0.2)" } : { opacity: 0.65 }}
-              >
-                <div className="flex items-start gap-3">
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ background: cfg.bg }}
-                  >
-                    <Icon className="w-5 h-5" style={{ color: cfg.color }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2 mb-0.5">
-                      <p style={{ fontWeight: 600, fontSize: "14px", color: "#0a1628" }}>{n.title}</p>
-                      {!n.read && (
-                        <div
-                          className="w-2 h-2 rounded-full flex-shrink-0 mt-1"
-                          style={{ background: "#007AFF" }}
-                        />
-                      )}
-                    </div>
-                    <p style={{ fontSize: "13px", color: "#3c3c43", marginBottom: "4px", lineHeight: 1.4 }}>
-                      {n.message}
-                    </p>
-                    <p style={{ fontSize: "12px", color: "#8E8E93" }}>
-                      {formatDistanceToNow(new Date(n.timestamp), { addSuffix: true, locale: ru })}
-                    </p>
-                  </div>
-                </div>
-              </motion.div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="flex flex-col items-center justify-center h-[55vh] text-center p-8">
-          <div
-            className="w-20 h-20 rounded-full flex items-center justify-center mb-4"
-            style={{ background: "rgba(0,122,255,0.08)" }}
-          >
-            <Bell className="w-10 h-10" style={{ color: "#8E8E93" }} />
-          </div>
-          <p style={{ fontWeight: 600, color: "#0a1628", marginBottom: "8px" }}>Нет уведомлений</p>
-          <p style={{ fontSize: "14px", color: "#8E8E93" }}>Здесь будут появляться важные обновления</p>
-        </div>
-      )}
     </div>
   );
 }

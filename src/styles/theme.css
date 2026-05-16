@@ -1,47 +1,106 @@
 @custom-variant dark (&:is(.dark *));
 
+/* ─── LIGHT THEME (activated by html[data-theme="light"]) ─────── */
+/* Soft ocean-foam palette: pale aqua-tinted whites, deep navy text,
+   bioluminescent cyan accent stays consistent with brand. */
+html[data-theme="light"] {
+  --abyss:     oklch(0.98 0.008 220);
+  --bg:        oklch(0.985 0.012 220);
+  --deep:      #ffffff;
+  --surface:   oklch(0.985 0.008 220);
+  --surface2:  oklch(0.95 0.015 215);
+  --line:      oklch(0.86 0.025 215);
+  --line-soft: oklch(0.93 0.018 215);
+
+  --ivory:    oklch(0.20 0.030 240);   /* primary text — deep navy */
+  --warm:     oklch(0.30 0.025 240);
+  --muted-fg: oklch(0.48 0.030 230);
+  --faint:    oklch(0.62 0.025 220);
+
+  --signal:     oklch(0.55 0.135 220);   /* deeper sea-cyan for contrast */
+  --signal-dim: oklch(0.68 0.110 220);
+  --amber:      oklch(0.62 0.160 60);
+  --danger:     oklch(0.58 0.220 25);
+
+  --ring: oklch(0.55 0.135 220 / 0.45);
+}
+html[data-theme="light"] body,
+html[data-theme="light"] {
+  background: var(--bg);
+  color: var(--ivory);
+}
+/* Make the moody Atmosphere overlay soft on light */
+html[data-theme="light"] .atmosphere-light {
+  opacity: 0.35;
+}
+
 :root {
   --font-size: 16px;
 
+  /* ─── W·52 MOODY BRAND palette ─────────────────────────── */
+  /* abyssal navy · bioluminescent cyan · warm ivory */
+  --abyss:     oklch(0.130 0.025 240);
+  --bg:        oklch(0.155 0.025 240);
+  --deep:      oklch(0.195 0.030 240);
+  --surface:   oklch(0.230 0.034 240);
+  --surface2:  oklch(0.285 0.038 240);
+  --line:      oklch(0.370 0.040 240);
+  --line-soft: oklch(0.295 0.035 240);
+
+  --ivory:    oklch(0.965 0.012 80);
+  --warm:     oklch(0.92 0.025 70);
+  --muted-fg: oklch(0.72 0.025 240);
+  --faint:    oklch(0.52 0.030 240);
+
+  --signal:     oklch(0.86 0.130 195);
+  --signal-dim: oklch(0.62 0.105 195);
+  --amber:      oklch(0.80 0.110 65);
+  --danger:     oklch(0.68 0.190 25);
+
+  --serif: 'Instrument Serif', 'Iowan Old Style', 'Cambria', serif;
+  --sans:  'Instrument Sans', -apple-system, system-ui, sans-serif;
+  --mono:  'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+
+  /* ─── shadcn / tailwind semantic vars (mapped to moody) ── */
   --background: transparent;
-  --foreground: #0a1628;
-  --card: rgba(255, 255, 255, 0.72);
-  --card-foreground: #0a1628;
-  --popover: rgba(255, 255, 255, 0.92);
-  --popover-foreground: #0a1628;
-  --primary: #007AFF;
-  --primary-foreground: #ffffff;
-  --secondary: rgba(0, 122, 255, 0.08);
-  --secondary-foreground: #007AFF;
-  --muted: rgba(0, 0, 0, 0.04);
-  --muted-foreground: #8E8E93;
-  --accent: rgba(0, 122, 255, 0.08);
-  --accent-foreground: #007AFF;
-  --destructive: #FF3B30;
-  --destructive-foreground: #ffffff;
-  --border: rgba(0, 0, 0, 0.08);
-  --input: rgba(255, 255, 255, 0.72);
-  --input-background: rgba(255, 255, 255, 0.72);
-  --switch-background: rgba(0, 122, 255, 0.3);
+  --foreground: var(--ivory);
+  --card: var(--deep);
+  --card-foreground: var(--ivory);
+  --popover: var(--surface);
+  --popover-foreground: var(--ivory);
+  --primary: var(--ivory);
+  --primary-foreground: var(--abyss);
+  --secondary: var(--surface);
+  --secondary-foreground: var(--ivory);
+  --muted: var(--surface);
+  --muted-foreground: var(--muted-fg);
+  --accent: var(--signal);
+  --accent-foreground: var(--abyss);
+  --destructive: var(--danger);
+  --destructive-foreground: var(--ivory);
+  --border: var(--line-soft);
+  --input: var(--surface);
+  --input-background: var(--surface);
+  --switch-background: var(--line);
   --font-weight-medium: 500;
   --font-weight-normal: 400;
-  --ring: rgba(0, 122, 255, 0.35);
-  --radius: 0.75rem;
+  --ring: oklch(0.62 0.105 195 / 0.45);
+  --radius: 0.875rem;
 
-  --chart-1: #007AFF;
-  --chart-2: #5AC8FA;
-  --chart-3: #34C759;
-  --chart-4: #FF9500;
-  --chart-5: #FF3B30;
+  --chart-1: var(--signal);
+  --chart-2: var(--signal-dim);
+  --chart-3: var(--ivory);
+  --chart-4: var(--amber);
+  --chart-5: var(--danger);
 
-  --sidebar: rgba(255, 255, 255, 0.72);
-  --sidebar-foreground: #0a1628;
-  --sidebar-primary: #007AFF;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: rgba(0, 122, 255, 0.08);
-  --sidebar-accent-foreground: #007AFF;
-  --sidebar-border: rgba(0, 0, 0, 0.08);
-  --sidebar-ring: rgba(0, 122, 255, 0.3);
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--ivory);
+  --sidebar-primary: var(--ivory);
+  --sidebar-primary-foreground: var(--abyss);
+  --sidebar-accent: var(--signal);
+  --sidebar-accent-foreground: var(--abyss);
+  --sidebar-border: var(--line-soft);
+  --sidebar-ring: var(--ring);
 }
 
 @theme inline {
@@ -88,24 +147,29 @@
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    box-sizing: border-box;
   }
 
   html {
     font-size: var(--font-size);
-    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif;
+    font-family: var(--sans);
+    background: var(--abyss);
   }
 
   body {
     @apply text-foreground;
-    background: linear-gradient(180deg, #DCEEFB 0%, #EEF6FF 45%, #E6F0FF 100%) fixed;
+    background: var(--bg);
     min-height: 100%;
+    letter-spacing: -0.005em;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
-  h1 { font-size: var(--text-2xl); font-weight: 700; line-height: 1.2; letter-spacing: -0.5px; }
-  h2 { font-size: var(--text-xl); font-weight: 600; line-height: 1.3; }
-  h3 { font-size: var(--text-lg); font-weight: 600; line-height: 1.4; }
-  h4 { font-size: var(--text-base); font-weight: var(--font-weight-medium); line-height: 1.5; }
-  label { font-size: var(--text-base); font-weight: var(--font-weight-medium); line-height: 1.5; }
-  button { font-size: var(--text-base); font-weight: var(--font-weight-medium); line-height: 1.5; }
-  input { font-size: var(--text-base); font-weight: var(--font-weight-normal); line-height: 1.5; }
+  h1 { font-size: var(--text-2xl); font-weight: 600; line-height: 1.1; letter-spacing: -0.025em; }
+  h2 { font-size: var(--text-xl);  font-weight: 600; line-height: 1.2; letter-spacing: -0.02em; }
+  h3 { font-size: var(--text-lg);  font-weight: 600; line-height: 1.3; letter-spacing: -0.015em; }
+  h4 { font-size: var(--text-base); font-weight: 500; line-height: 1.4; }
+  label { font-size: var(--text-base); font-weight: 500; line-height: 1.5; }
+  button { font-size: var(--text-base); font-weight: 500; line-height: 1.5; font-family: var(--sans); }
+  input { font-size: var(--text-base); font-weight: 400; line-height: 1.5; font-family: var(--sans); }
 }

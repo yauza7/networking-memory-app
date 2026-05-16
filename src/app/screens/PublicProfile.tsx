@@ -140,7 +140,7 @@ export function PublicProfile() {
         </h2>
         <p style={{ fontSize: "14px", color: "#8E8E93", textAlign: "center", marginBottom: "24px" }}>
           {canSaveByUsername
-            ? "Этот пользователь ещё не в W·52 — можно добавить по username"
+            ? "Этот пользователь ещё не в Echo — можно добавить по username"
             : "Ссылка некорректна или профиль не существует"}
         </p>
         {canSaveByUsername && (
@@ -298,7 +298,7 @@ export function PublicProfile() {
         </motion.div>
 
         <p style={{ textAlign: "center", color: "#C7C7CC", fontSize: "12px", paddingTop: "4px" }}>
-          Профиль создан в W·52
+          Профиль создан в Echo
         </p>
       </div>
     </div>

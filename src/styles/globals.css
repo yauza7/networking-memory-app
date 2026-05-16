@@ -2,89 +2,206 @@
 html, body {
   overscroll-behavior: none;
   overscroll-behavior-y: none;
+  background: var(--bg);
+  color: var(--ivory);
 }
 
-/* ── Liquid glass card ────────────────────────────────────── */
-.glass-card {
-  background: rgba(255, 255, 255, 0.78);
-  backdrop-filter: blur(40px) saturate(200%);
-  -webkit-backdrop-filter: blur(40px) saturate(200%);
-  border: 0.5px solid rgba(255, 255, 255, 0.9);
-  border-radius: 22px;
-  box-shadow:
-    0 8px 32px rgba(0, 80, 180, 0.10),
-    0 2px 8px rgba(0, 0, 0, 0.06),
-    inset 0 1px 0 rgba(255, 255, 255, 1);
+/* ── Native input/textarea reset (suppresses iOS WebKit border) ─ */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+textarea,
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  background-clip: padding-box;
+}
+input:focus,
+textarea:focus,
+select:focus,
+button:focus {
+  outline: none;
 }
 
-/* Apply glass to bg-card too */
-.bg-card {
-  background: rgba(255, 255, 255, 0.78) !important;
-  backdrop-filter: blur(40px) saturate(200%);
-  -webkit-backdrop-filter: blur(40px) saturate(200%);
-  border: 0.5px solid rgba(255, 255, 255, 0.9) !important;
-  box-shadow:
-    0 8px 32px rgba(0, 80, 180, 0.10),
-    0 2px 8px rgba(0, 0, 0, 0.06),
-    inset 0 1px 0 rgba(255, 255, 255, 1);
+/* Completely chromeless input for use inside custom-styled containers */
+.bare-input {
+  border: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  min-width: 0;
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
-/* ── iOS-style tag pills ─────────────────────────────────── */
+/* ─── W·52 typography helpers ──────────────────────────── */
+.font-serif  { font-family: var(--serif); font-weight: 400; letter-spacing: -0.01em; }
+.font-sans-w { font-family: var(--sans); }
+.font-mono   { font-family: var(--mono); letter-spacing: 0; font-weight: 400; }
+.it          { font-style: italic; }
+
+.text-ivory    { color: var(--ivory); }
+.text-muted-w  { color: var(--muted-fg); }
+.text-faint    { color: var(--faint); }
+.text-signal   { color: var(--signal); }
+.text-amber    { color: var(--amber); }
+
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.hairline {
+  height: 1px;
+  background: var(--line-soft);
+  width: 100%;
+}
+
+/* ─── Moody card (replaces .glass-card) ────────────────── */
+.glass-card,
+.bg-card,
+.moody-card {
+  background: var(--deep) !important;
+  border: 1px solid var(--line-soft) !important;
+  border-radius: 18px;
+  color: var(--ivory);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+}
+
+.moody-card-soft {
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: 16px;
+  color: var(--ivory);
+}
+
+/* ─── iOS-style tag pills ─────────────────────────────── */
 .ios-tag, .ocean-tag {
-  background: rgba(0, 122, 255, 0.08);
-  border: 0.5px solid rgba(0, 122, 255, 0.15);
-  border-radius: 20px;
-  color: #007AFF;
-  font-size: 13px;
+  background: oklch(0.86 0.13 195 / 0.10);
+  border: 1px solid oklch(0.62 0.105 195 / 0.30);
+  border-radius: 100px;
+  color: var(--signal);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
   padding: 4px 10px;
-  font-weight: 500;
+  font-weight: 400;
   display: inline-block;
 }
 
-/* ── iOS primary button ──────────────────────────────────── */
+/* ─── Primary button — ivory on abyss ──────────────────── */
 .btn-ios {
-  background: linear-gradient(180deg, #3AA3FF 0%, #007AFF 50%, #0063D1 100%);
+  background: var(--ivory);
+  color: var(--abyss);
+  border-radius: 16px;
+  height: 54px;
+  font-size: 15px;
+  font-family: var(--sans);
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  box-shadow: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  border: none;
+  cursor: pointer;
+}
+
+.btn-ios:active { transform: scale(0.98); }
+
+/* ─── Signal (cyan) button ─────────────────────────────── */
+.btn-signal {
+  background: var(--signal);
+  color: var(--abyss);
+  border-radius: 16px;
+  height: 54px;
+  font-size: 15px;
+  font-family: var(--sans);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 24px oklch(0.86 0.13 195 / 0.30);
+}
+
+/* ─── Ghost button ─────────────────────────────────────── */
+.btn-ghost-w {
+  background: var(--surface);
+  color: var(--ivory);
+  border: 1px solid var(--line-soft);
   border-radius: 14px;
-  height: 50px;
-  font-size: 17px;
-  font-weight: 600;
-  color: white;
-  box-shadow:
-    0 4px 20px rgba(0, 122, 255, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  height: 48px;
+  font-family: var(--sans);
+  font-size: 14px;
+  font-weight: 500;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
+  cursor: pointer;
   width: 100%;
 }
 
-/* ── Logo serif ──────────────────────────────────────────── */
-.font-serif-logo {
-  font-family: Georgia, 'Times New Roman', serif;
-}
+/* ─── Logo serif ──────────────────────────────────────── */
+.font-serif-logo { font-family: var(--serif); }
 
-/* ── Avatar ring ─────────────────────────────────────────── */
+/* ─── Avatar ring ─────────────────────────────────────── */
 .avatar-ocean {
-  box-shadow: 0 0 0 2.5px rgba(255, 255, 255, 0.85), 0 2px 8px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 0 0 1px var(--line-soft), 0 2px 8px rgba(0,0,0,0.45);
 }
 
-/* ── Scrollbar hide ──────────────────────────────────────── */
+/* ─── Scrollbar hide ──────────────────────────────────── */
 .scrollbar-hide::-webkit-scrollbar { display: none; }
 .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* ── Inputs ──────────────────────────────────────────────── */
+/* ─── Inputs ───────────────────────────────────────────── */
 input, textarea, select {
-  background: rgba(255, 255, 255, 0.72) !important;
-  border: 0.5px solid rgba(0, 0, 0, 0.1) !important;
-  border-radius: 12px;
-  color: #0a1628 !important;
+  background: var(--surface) !important;
+  border: 1px solid var(--line-soft) !important;
+  border-radius: 14px;
+  color: var(--ivory) !important;
+  font-family: var(--sans);
+  caret-color: var(--signal);
 }
 input::placeholder, textarea::placeholder {
-  color: #8E8E93 !important;
+  color: var(--faint) !important;
+  font-family: var(--serif);
+  font-style: italic;
 }
 input:focus, textarea:focus, select:focus {
-  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15) !important;
-  border-color: rgba(0, 122, 255, 0.4) !important;
+  box-shadow: 0 0 0 3px oklch(0.62 0.105 195 / 0.20) !important;
+  border-color: var(--signal-dim) !important;
   outline: none;
+}
+
+/* ─── Sonar / ping animation ──────────────────────────── */
+@keyframes w52-ping {
+  0%   { transform: scale(0.4); opacity: 0.9; }
+  100% { transform: scale(2.6); opacity: 0;   }
+}
+@keyframes w52-pulse-glow {
+  0%, 100% { box-shadow: 0 0 18px oklch(0.86 0.13 195 / 0.35); }
+  50%      { box-shadow: 0 0 32px oklch(0.86 0.13 195 / 0.65); }
+}
+
+.signal-glow { animation: w52-pulse-glow 2.8s ease-in-out infinite; }
+
+/* ─── Force dark backgrounds where tailwind helpers leak ── */
+.bg-white, .bg-gray-50, .bg-gray-100 {
+  background: var(--deep) !important;
+  color: var(--ivory) !important;
 }

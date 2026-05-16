@@ -1,9 +1,22 @@
+/**
+ * W·52 — Заметка (AddNote)
+ * Moody. Sonar-pinging record button (cyan), text area as serif italic,
+ * cyan "Создать AI-сводку" CTA. All voice/AI logic preserved.
+ */
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router";
-import { ArrowLeft, Mic, Square, Sparkles, Check, Loader2, Volume2, X } from "lucide-react";
+import { Mic, Square, Check, Loader2, Volume2, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { mockContacts } from "../utils/mockData";
 import { allContacts, updateStoredContact } from "../utils/contactStore";
+import {
+  Atmosphere,
+  RoundBtn,
+  SignalBtn,
+  AISparkle,
+  Hero,
+  cardStyle,
+} from "../components/brand/Brand";
 
 const SYSTEM_PROMPT = `You are a networking assistant for affiliate marketing industry.
 Extract key information from a meeting note.
@@ -33,7 +46,9 @@ async function analyzeNote(text: string): Promise<AIResult> {
   });
   if (!response.ok) throw new Error(`API ${response.status}`);
   const data = await response.json();
-  const raw = (data.content?.[0]?.text ?? "{}").replace(/```json\n?|\n?```/g, "").trim();
+  const raw = (data.content?.[0]?.text ?? "{}")
+    .replace(/```json\n?|\n?```/g, "")
+    .trim();
   return JSON.parse(raw) as AIResult;
 }
 
@@ -41,7 +56,9 @@ function getInitData(): string | null {
   try {
     const tg = (window as any).Telegram?.WebApp;
     return typeof tg?.initData === "string" && tg.initData ? tg.initData : null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 async function transcribeBlob(blob: Blob): Promise<string | null> {
@@ -59,14 +76,15 @@ async function transcribeBlob(blob: Blob): Promise<string | null> {
     if (!r.ok) return null;
     const data = await r.json();
     return typeof data.text === "string" ? data.text : null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
 export function AddNote() {
   const [searchParams] = useSearchParams();
   const contactId = searchParams.get("contact") || "";
   const navigate = useNavigate();
-
   const contact = allContacts(mockContacts).find((c) => c.id === contactId) ?? null;
 
   const [textNote, setTextNote] = useState("");
@@ -75,12 +93,16 @@ export function AddNote() {
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [micError, setMicError] = useState<string | null>(null);
-  const [step, setStep] = useState<"input" | "processing" | "done" | "done_no_ai">("input");
+  const [step, setStep] = useState<
+    "input" | "processing" | "done" | "done_no_ai"
+  >("input");
   const [aiResult, setAiResult] = useState<AIResult | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  const recognitionRef = useRef<any>(null);
+  const liveTranscriptRef = useRef<string>("");
 
   useEffect(() => {
     let t: ReturnType<typeof setInterval>;
@@ -88,63 +110,121 @@ export function AddNote() {
     return () => clearInterval(t);
   }, [isRecording]);
 
-  // Clean up stream on unmount
-  useEffect(() => () => { streamRef.current?.getTracks().forEach((t) => t.stop()); }, []);
+  useEffect(
+    () => () => {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+    },
+    []
+  );
 
-  const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  const fmt = (s: number) =>
+    `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
   const startRecording = async () => {
     setMicError(null);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
-      chunksRef.current = [];
 
-      // Prefer webm/opus; fall back to whatever the browser supports
+    // ── 1. Browser-native live transcription (works offline, no backend) ──
+    const SR =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
+    if (SR) {
+      try {
+        const recog = new SR();
+        recog.lang = "ru-RU";
+        recog.continuous = true;
+        recog.interimResults = true;
+        liveTranscriptRef.current = "";
+        let finalText = "";
+        recog.onresult = (e: any) => {
+          let interim = "";
+          for (let i = e.resultIndex; i < e.results.length; i++) {
+            const t = e.results[i][0].transcript;
+            if (e.results[i].isFinal) finalText += t + " ";
+            else interim += t;
+          }
+          liveTranscriptRef.current = (finalText + interim).trim();
+          // Mirror into the textarea live
+          setTextNote((prev) => {
+            // strip any previous live-transcript suffix
+            const marker = "\n\n[…голосом] ";
+            const idx = prev.indexOf(marker);
+            const base = idx >= 0 ? prev.slice(0, idx) : prev;
+            return liveTranscriptRef.current
+              ? base + marker + liveTranscriptRef.current
+              : base;
+          });
+        };
+        recog.onerror = () => {};
+        recog.onend = () => {
+          // finalize: replace the live-transcript marker with a clean append
+          if (liveTranscriptRef.current) {
+            setTextNote((prev) => {
+              const marker = "\n\n[…голосом] ";
+              const idx = prev.indexOf(marker);
+              const base = idx >= 0 ? prev.slice(0, idx).trim() : prev.trim();
+              const tail = liveTranscriptRef.current.trim();
+              return base ? `${base}\n\n${tail}` : tail;
+            });
+          }
+        };
+        recognitionRef.current = recog;
+        recog.start();
+      } catch {
+        recognitionRef.current = null;
+      }
+    }
+
+    try {
+      // Reuse existing stream if still active to avoid re-prompting for permission
+      let stream = streamRef.current;
+      const tracksLive = stream?.getTracks().some((t) => t.readyState === "live");
+      if (!stream || !tracksLive) {
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        streamRef.current = stream;
+      }
+      chunksRef.current = [];
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
         ? "audio/webm;codecs=opus"
         : MediaRecorder.isTypeSupported("audio/webm")
-          ? "audio/webm"
-          : "";
-
+        ? "audio/webm"
+        : "";
       const mr = new MediaRecorder(stream, mimeType ? { mimeType } : {});
       mediaRecorderRef.current = mr;
-
-      mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
+      mr.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
       mr.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop());
-        const blob = new Blob(chunksRef.current, { type: mr.mimeType || "audio/webm" });
+        // Keep the stream alive for re-use within this session — no re-prompts.
+        const blob = new Blob(chunksRef.current, {
+          type: mr.mimeType || "audio/webm",
+        });
         setAudioBlob(blob);
         setIsRecording(false);
-
-        // Auto-transcribe
         const initData = getInitData();
         if (initData) {
           setIsTranscribing(true);
           const text = await transcribeBlob(blob);
           setIsTranscribing(false);
-          if (text) {
-            setTextNote((prev) => prev ? `${prev}\n\n${text}` : text);
-          }
+          if (text)
+            setTextNote((prev) => (prev ? `${prev}\n\n${text}` : text));
         }
       };
-
-      mr.start(1000); // collect chunks every second
+      mr.start(1000);
       setIsRecording(true);
       setRecordingSecs(0);
       setAudioBlob(null);
     } catch (e: any) {
-      if (e?.name === "NotAllowedError") {
+      if (e?.name === "NotAllowedError")
         setMicError("Нет доступа к микрофону. Разрешите в настройках браузера.");
-      } else {
-        setMicError("Не удалось открыть микрофон.");
-      }
+      else setMicError("Не удалось открыть микрофон.");
     }
   };
 
   const stopRecording = () => {
+    try {
+      recognitionRef.current?.stop();
+    } catch {}
     mediaRecorderRef.current?.stop();
-    // isRecording will be set to false in onstop
   };
 
   const goToContact = () => {
@@ -155,22 +235,27 @@ export function AddNote() {
   const handleSave = async () => {
     if (!textNote.trim() && !audioBlob) return;
     setStep("processing");
-
-    const noteText = textNote.trim() || "Голосовая заметка";
-
-    // Save note immediately — regardless of AI
+    const noteText = textNote.trim();
+    if (!noteText) {
+      setStep("done_no_ai");
+      return;
+    }
     if (contactId) {
       const existing = allContacts(mockContacts).find((c) => c.id === contactId);
       const prev = existing?.note ? `${existing.note}\n\n` : "";
       updateStoredContact(contactId, { note: `${prev}${noteText}` });
     }
-
     try {
       const result = await analyzeNote(noteText);
       if (contactId) {
-        const dueDate = new Date(Date.now() + (result.followUpDays ?? 7) * 86400_000)
-          .toISOString().split("T")[0];
-        const current = allContacts(mockContacts).find((c) => c.id === contactId);
+        const dueDate = new Date(
+          Date.now() + (result.followUpDays ?? 7) * 86400_000
+        )
+          .toISOString()
+          .split("T")[0];
+        const current = allContacts(mockContacts).find(
+          (c) => c.id === contactId
+        );
         updateStoredContact(contactId, {
           aiSummary: result.summary,
           followUpDate: dueDate,
@@ -185,229 +270,635 @@ export function AddNote() {
     }
   };
 
-  // ── No-AI done ─────────────────────────────────────────────
+  // ── Status screens ───────────────────────────────────────
   if (step === "done_no_ai") {
     setTimeout(goToContact, 2000);
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center">
-        <motion.div
-          initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: "spring", stiffness: 380, damping: 22 }}
-          className="w-24 h-24 rounded-3xl flex items-center justify-center mb-6"
-          style={{ background: "#34C759", boxShadow: "0 12px 40px rgba(52,199,89,0.35)" }}
-        >
-          <Check className="w-12 h-12 text-white" />
-        </motion.div>
-        <h2 style={{ fontSize: "22px", fontWeight: 700, color: "#0a1628", marginBottom: "6px" }}>Заметка сохранена</h2>
-        <p style={{ fontSize: "14px", color: "#8E8E93" }}>AI временно недоступен — заметка сохранена без обработки</p>
-      </div>
+      <StatusScreen
+        icon={<Check className="w-10 h-10" style={{ color: "var(--abyss)" }} />}
+        iconBg="var(--signal)"
+        title="Заметка сохранена"
+        subtitle="AI временно недоступен — заметка сохранена без обработки"
+      />
     );
   }
 
-  // ── Processing ─────────────────────────────────────────────
   if (step === "processing") {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center">
-        <motion.div
-          animate={{ scale: [1, 1.08, 1] }} transition={{ duration: 1.4, repeat: Infinity }}
-          className="w-24 h-24 rounded-3xl flex items-center justify-center mb-6"
-          style={{ background: "linear-gradient(135deg, #5AC8FA, #007AFF)", boxShadow: "0 12px 40px rgba(0,122,255,0.4)" }}
-        >
-          <Sparkles className="w-12 h-12 text-white" />
-        </motion.div>
-        <h2 style={{ fontSize: "22px", fontWeight: 700, color: "#0a1628", marginBottom: "8px" }}>AI обрабатывает заметку</h2>
-        <p style={{ fontSize: "15px", color: "#8E8E93", marginBottom: "20px" }}>Создаю summary и извлекаю теги…</p>
-        <div className="flex items-center gap-2" style={{ color: "#8E8E93", fontSize: "13px" }}>
-          <Loader2 className="w-4 h-4 animate-spin" />
-          claude-sonnet-4 думает…
-        </div>
-      </div>
+      <StatusScreen
+        icon={
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+          >
+            <AISparkle size={40} />
+          </motion.div>
+        }
+        iconBg="oklch(0.86 0.13 195 / 0.18)"
+        iconBorder="1px solid var(--signal-dim)"
+        title="AI обрабатывает заметку"
+        subtitle="Создаю summary, извлекаю теги, определяю срок follow-up"
+        footer={
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              color: "var(--faint)",
+              fontFamily: "var(--mono)",
+              fontSize: 11,
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+            }}
+          >
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            обработка
+          </div>
+        }
+      />
     );
   }
 
-  // ── Done with AI ───────────────────────────────────────────
   if (step === "done" && aiResult) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center">
-        <motion.div
-          initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: "spring", stiffness: 380, damping: 22 }}
-          className="w-24 h-24 rounded-3xl flex items-center justify-center mb-6"
-          style={{ background: "#34C759", boxShadow: "0 12px 40px rgba(52,199,89,0.35)" }}
-        >
-          <Check className="w-12 h-12 text-white" />
-        </motion.div>
-        <h2 style={{ fontSize: "22px", fontWeight: 700, color: "#0a1628", marginBottom: "6px" }}>Заметка сохранена!</h2>
-        <p style={{ fontSize: "14px", color: "#8E8E93", marginBottom: "24px" }}>Follow-up через {aiResult.followUpDays} дн.</p>
-        <div className="glass-card p-5 w-full max-w-sm text-left mb-4">
-          <div className="flex items-center gap-2 mb-3">
-            <Sparkles className="w-4 h-4" style={{ color: "#007AFF" }} />
-            <p style={{ fontWeight: 600, fontSize: "13px", color: "#8E8E93", textTransform: "uppercase", letterSpacing: "0.4px" }}>AI Summary</p>
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "var(--bg)",
+          color: "var(--ivory)",
+          padding: "0 22px",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          textAlign: "center",
+          position: "relative",
+        }}
+      >
+        <Atmosphere intensity={0.5} />
+        <div style={{ position: "relative", zIndex: 1, maxWidth: 360 }}>
+          <motion.div
+            initial={{ scale: 0.7, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 380, damping: 22 }}
+            style={{
+              width: 80,
+              height: 80,
+              borderRadius: "50%",
+              background: "var(--signal)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              margin: "0 auto 22px",
+              boxShadow: "0 12px 40px oklch(0.86 0.13 195 / 0.35)",
+            }}
+          >
+            <Check className="w-10 h-10" style={{ color: "var(--abyss)" }} />
+          </motion.div>
+          <Hero size={28}>Заметка сохранена</Hero>
+          <p
+            className="font-serif it text-muted-w"
+            style={{ fontSize: 15, marginTop: 8 }}
+          >
+            Follow-up через {aiResult.followUpDays} дн.
+          </p>
+
+          <div style={{ ...cardStyle, marginTop: 22, textAlign: "left" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 8,
+              }}
+            >
+              <AISparkle size={11} />
+              <span className="eyebrow" style={{ color: "var(--signal)" }}>
+                AI · SUMMARY
+              </span>
+            </div>
+            <p
+              className="font-serif"
+              style={{ fontSize: 15, lineHeight: 1.5, margin: 0 }}
+            >
+              {aiResult.summary}
+            </p>
           </div>
-          <p style={{ fontSize: "14px", color: "#3c3c43", lineHeight: 1.55 }}>{aiResult.summary}</p>
+
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 6,
+              justifyContent: "center",
+              marginTop: 18,
+            }}
+          >
+            {aiResult.tags.map((tag) => (
+              <span key={tag} className="ios-tag">
+                {tag}
+              </span>
+            ))}
+          </div>
+
+          <p
+            className="font-mono"
+            style={{
+              fontSize: 10,
+              color: "var(--faint)",
+              marginTop: 22,
+              letterSpacing: "0.16em",
+              textTransform: "uppercase",
+            }}
+          >
+            Открываю карточку контакта…
+          </p>
         </div>
-        <div className="flex flex-wrap gap-2 justify-center mb-6 max-w-sm">
-          {aiResult.tags.map((tag) => <span key={tag} className="ios-tag">{tag}</span>)}
-        </div>
-        <p style={{ fontSize: "13px", color: "#C7C7CC" }}>Перехожу к карточке контакта…</p>
       </div>
     );
   }
 
-  // ── Input ──────────────────────────────────────────────────
+  // ── Main input ─────────────────────────────────────────────
   return (
-    <div className="min-h-screen pb-20">
-      <div className="flex items-center justify-between px-4 pt-14 pb-4">
-        <div className="flex items-center gap-3">
-          <button onClick={goToContact} style={{ color: "#007AFF" }}>
-            <ArrowLeft className="w-5 h-5" />
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "var(--bg)",
+        color: "var(--ivory)",
+        position: "relative",
+        paddingBottom: 40,
+      }}
+    >
+      <Atmosphere intensity={0.3} />
+
+      <div style={{ position: "relative", zIndex: 1 }}>
+        {/* Top bar */}
+        <div
+          style={{
+            padding: "56px 18px 0",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <RoundBtn onClick={goToContact}>
+            <svg width="10" height="14" viewBox="0 0 10 14">
+              <path
+                d="M8 1L2 7l6 6"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+              />
+            </svg>
+          </RoundBtn>
+          <span
+            className="font-mono"
+            style={{
+              fontSize: 11,
+              color: "var(--muted-fg)",
+              letterSpacing: "0.14em",
+              textTransform: "uppercase",
+            }}
+          >
+            ЗАПИСЬ{contact && ` · ${contact.user.name.split(" ")[0]}`}
+          </span>
+          <button
+            onClick={goToContact}
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "var(--muted-fg)",
+              fontSize: 13,
+              fontFamily: "var(--sans)",
+              cursor: "pointer",
+            }}
+          >
+            Пропустить
           </button>
-          <div>
-            <h1 style={{ fontSize: "24px", fontWeight: 700, color: "#0a1628", letterSpacing: "-0.3px" }}>Заметка</h1>
-            {contact && <p style={{ fontSize: "13px", color: "#8E8E93" }}>{contact.user.name}</p>}
-          </div>
         </div>
-        <button onClick={goToContact} style={{ fontSize: "16px", color: "#007AFF", fontWeight: 500 }}>
-          Пропустить
-        </button>
-      </div>
 
-      <div className="px-4 space-y-4">
+        {/* Hero question */}
+        <div style={{ textAlign: "center", padding: "24px 28px 0" }}>
+          <Hero size={32}>
+            Что сохранить
+            <br />
+            <span className="it text-muted-w">из встречи?</span>
+          </Hero>
+        </div>
 
-        {/* Voice recording */}
-        <div className="glass-card p-5">
-          <p style={{ fontSize: "13px", fontWeight: 600, color: "#8E8E93", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "16px" }}>
-            🎙 Голосовая заметка
-          </p>
-
-          <AnimatePresence mode="wait">
-            {isTranscribing ? (
-              <motion.div
-                key="transcribing"
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="flex flex-col items-center py-4"
-              >
-                <Loader2 className="w-8 h-8 animate-spin mb-3" style={{ color: "#007AFF" }} />
-                <p style={{ fontSize: "14px", color: "#8E8E93" }}>Расшифровываю запись…</p>
-                <p style={{ fontSize: "12px", color: "#C7C7CC", marginTop: "4px" }}>Текст появится в поле ниже</p>
-              </motion.div>
-            ) : audioBlob ? (
-              <motion.div
-                key="recorded"
-                initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-                className="flex items-center justify-between p-3 rounded-xl"
-                style={{ background: "rgba(0,122,255,0.06)" }}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ background: "rgba(0,122,255,0.12)" }}>
-                    <Volume2 className="w-4 h-4" style={{ color: "#007AFF" }} />
-                  </div>
-                  <div>
-                    <p style={{ fontSize: "14px", fontWeight: 600, color: "#0a1628" }}>Записано {fmt(recordingSecs)}</p>
-                    <p style={{ fontSize: "12px", color: "#34C759" }}>
-                      {getInitData() ? "Расшифровка добавлена в текст ↓" : "Текст добавлен вручную"}
-                    </p>
-                  </div>
-                </div>
-                <button onClick={() => { setAudioBlob(null); setRecordingSecs(0); }}
-                  className="p-2 rounded-full" style={{ background: "rgba(0,0,0,0.05)" }}>
-                  <X className="w-4 h-4" style={{ color: "#8E8E93" }} />
-                </button>
-              </motion.div>
-            ) : (
-              <motion.div key="idle" className="flex flex-col items-center">
-                <button
-                  onClick={isRecording ? stopRecording : startRecording}
-                  className="w-24 h-24 rounded-full flex items-center justify-center mb-4 transition-all active:scale-95"
-                  style={isRecording
-                    ? { background: "#FF3B30", boxShadow: "0 8px 28px rgba(255,59,48,0.4)" }
-                    : { background: "linear-gradient(135deg, #5AC8FA, #007AFF)", boxShadow: "0 8px 28px rgba(0,122,255,0.35)" }}
+        {/* Voice card */}
+        <div style={{ padding: "32px 16px 0" }}>
+          <div
+            style={{
+              ...cardStyle,
+              padding: "24px 18px 26px",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+            }}
+          >
+            <span className="eyebrow" style={{ alignSelf: "flex-start" }}>
+              ГОЛОСОМ
+            </span>
+            <AnimatePresence mode="wait">
+              {isTranscribing ? (
+                <motion.div
+                  key="transcribing"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    padding: "20px 0",
+                  }}
                 >
-                  {isRecording
-                    ? <Square className="w-10 h-10 text-white" />
-                    : <Mic className="w-10 h-10 text-white" />}
-                </button>
-                {isRecording ? (
-                  <div className="flex items-center gap-2">
-                    <motion.div
-                      className="w-2 h-2 rounded-full" style={{ background: "#FF3B30" }}
-                      animate={{ opacity: [1, 0.3, 1] }} transition={{ duration: 1, repeat: Infinity }}
-                    />
-                    <span style={{ fontSize: "18px", fontWeight: 700, color: "#FF3B30" }}>{fmt(recordingSecs)}</span>
-                    <span style={{ fontSize: "13px", color: "#8E8E93" }}>нажми ■ чтобы остановить</span>
-                  </div>
-                ) : (
-                  <p style={{ fontSize: "14px", color: "#8E8E93" }}>
-                    {getInitData() ? "Запись → автоматическая расшифровка" : "Нажмите для записи"}
+                  <Loader2
+                    className="w-7 h-7 animate-spin"
+                    style={{ color: "var(--signal)", marginBottom: 12 }}
+                  />
+                  <p
+                    className="font-serif it text-muted-w"
+                    style={{ fontSize: 14 }}
+                  >
+                    Расшифровываю запись…
                   </p>
-                )}
-                {micError && (
-                  <p style={{ fontSize: "12px", color: "#FF3B30", marginTop: "8px", textAlign: "center" }}>{micError}</p>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
+                </motion.div>
+              ) : audioBlob ? (
+                <motion.div
+                  key="recorded"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  style={{
+                    marginTop: 14,
+                    width: "100%",
+                    background: "var(--surface)",
+                    border: "1px solid var(--line-soft)",
+                    borderRadius: 14,
+                    padding: "12px 14px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 10,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 10,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                      <div
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: "50%",
+                          background: "oklch(0.86 0.13 195 / 0.18)",
+                          border: "1px solid var(--signal-dim)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Volume2 className="w-4 h-4" style={{ color: "var(--signal)" }} />
+                      </div>
+                      <div>
+                        <p style={{ fontFamily: "var(--sans)", fontSize: 14, margin: 0 }}>
+                          Записано {fmt(recordingSecs)}
+                        </p>
+                        <p
+                          className="font-mono"
+                          style={{
+                            fontSize: 10,
+                            color: textNote.trim() ? "var(--signal-dim)" : "var(--faint)",
+                            letterSpacing: "0.10em",
+                            marginTop: 4,
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          {textNote.trim()
+                            ? "Текст расшифрован ↓"
+                            : getInitData()
+                            ? "Без распознавания"
+                            : "Текст вручную"}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setAudioBlob(null);
+                        setRecordingSecs(0);
+                      }}
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: "50%",
+                        background: "transparent",
+                        border: "1px solid var(--line-soft)",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <X className="w-3.5 h-3.5" style={{ color: "var(--muted-fg)" }} />
+                    </button>
+                  </div>
+                  {textNote.trim() && (
+                    <div
+                      style={{
+                        background: "var(--deep)",
+                        border: "1px solid var(--line-soft)",
+                        borderRadius: 10,
+                        padding: "10px 12px",
+                        fontFamily: "var(--sans)",
+                        fontSize: 13.5,
+                        lineHeight: 1.5,
+                        color: "var(--warm)",
+                        maxHeight: 140,
+                        overflowY: "auto",
+                      }}
+                    >
+                      {textNote}
+                    </div>
+                  )}
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="idle"
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    marginTop: 14,
+                  }}
+                >
+                  <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    {/* sonar pings */}
+                    {isRecording ? (
+                      <>
+                        <motion.div
+                          style={{
+                            position: "absolute",
+                            width: 84,
+                            height: 84,
+                            borderRadius: "50%",
+                            border: "1px solid var(--signal)",
+                            pointerEvents: "none",
+                          }}
+                          animate={{ scale: [1, 1.5], opacity: [0.45, 0] }}
+                          transition={{ duration: 2.4, repeat: Infinity, ease: "easeOut" }}
+                        />
+                        <motion.div
+                          style={{
+                            position: "absolute",
+                            width: 84,
+                            height: 84,
+                            borderRadius: "50%",
+                            border: "1px solid var(--signal)",
+                            pointerEvents: "none",
+                          }}
+                          animate={{ scale: [1, 1.5], opacity: [0.45, 0] }}
+                          transition={{ duration: 2.4, repeat: Infinity, ease: "easeOut", delay: 1.2 }}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <motion.div
+                          style={{
+                            position: "absolute",
+                            width: 84,
+                            height: 84,
+                            borderRadius: "50%",
+                            border: "1px solid var(--signal-dim)",
+                            pointerEvents: "none",
+                          }}
+                          animate={{ scale: [1, 1.4], opacity: [0.30, 0] }}
+                          transition={{ duration: 2.8, repeat: Infinity, ease: "easeOut" }}
+                        />
+                        <motion.div
+                          style={{
+                            position: "absolute",
+                            width: 84,
+                            height: 84,
+                            borderRadius: "50%",
+                            border: "1px solid var(--signal-dim)",
+                            pointerEvents: "none",
+                          }}
+                          animate={{ scale: [1, 1.4], opacity: [0.30, 0] }}
+                          transition={{ duration: 2.8, repeat: Infinity, ease: "easeOut", delay: 1.4 }}
+                        />
+                      </>
+                    )}
+                    <button
+                      onClick={isRecording ? stopRecording : startRecording}
+                      style={{
+                        position: "relative",
+                        zIndex: 2,
+                        width: 84,
+                        height: 84,
+                        borderRadius: "50%",
+                        background: isRecording
+                          ? "var(--danger)"
+                          : "var(--signal)",
+                        border: "none",
+                        cursor: "pointer",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        boxShadow: isRecording
+                          ? "0 0 28px oklch(0.68 0.19 25 / 0.55)"
+                          : "0 0 28px oklch(0.86 0.13 195 / 0.55)",
+                      }}
+                    >
+                      {isRecording ? (
+                        <div
+                          style={{
+                            width: 22,
+                            height: 22,
+                            borderRadius: 4,
+                            background: "var(--ivory)",
+                          }}
+                        />
+                      ) : (
+                        <Mic
+                          className="w-9 h-9"
+                          style={{ color: "var(--abyss)" }}
+                        />
+                      )}
+                    </button>
+                  </div>
+                  <div
+                    className="font-mono"
+                    style={{
+                      marginTop: 16,
+                      fontSize: 12,
+                      color: isRecording ? "var(--signal)" : "var(--muted-fg)",
+                      letterSpacing: "0.16em",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {isRecording
+                      ? `REC · ${fmt(recordingSecs)}`
+                      : getInitData()
+                      ? "Tap · авто-расшифровка"
+                      : "Tap · запись"}
+                  </div>
+                  {micError && (
+                    <p
+                      className="font-serif it"
+                      style={{
+                        fontSize: 13,
+                        color: "var(--amber)",
+                        marginTop: 12,
+                        textAlign: "center",
+                      }}
+                    >
+                      {micError}
+                    </p>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
 
         {/* Divider */}
-        <div className="flex items-center gap-3">
-          <div className="flex-1 h-px" style={{ background: "rgba(0,0,0,0.08)" }} />
-          <span style={{ fontSize: "13px", color: "#8E8E93" }}>или текстом</span>
-          <div className="flex-1 h-px" style={{ background: "rgba(0,0,0,0.08)" }} />
-        </div>
-
-        {/* Text note */}
-        <div className="glass-card p-5">
-          <p style={{ fontSize: "13px", fontWeight: 600, color: "#8E8E93", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "12px" }}>
-            Текстовая заметка
-          </p>
-          <textarea
-            value={textNote}
-            onChange={(e) => setTextNote(e.target.value)}
-            placeholder="О чём говорили, что договорились, ключевые темы…"
-            rows={5}
-            className="w-full px-4 py-3 text-sm resize-none"
-            style={{ fontSize: "16px" }}
-          />
-          {textNote.trim().length > 0 && (
-            <div className="flex items-start gap-2 mt-3 p-3 rounded-xl" style={{ background: "rgba(0,122,255,0.05)" }}>
-              <Sparkles className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: "#007AFF" }} />
-              <p style={{ fontSize: "12px", color: "#007AFF" }}>
-                Claude AI создаст summary, извлечёт теги и определит срок follow-up
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Save */}
-        <button
-          onClick={handleSave}
-          disabled={(!textNote.trim() && !audioBlob) || isTranscribing}
-          className="w-full flex items-center justify-center gap-2 rounded-[14px] text-white font-semibold transition-all active:scale-97 disabled:opacity-40"
+        <div
           style={{
-            background: "linear-gradient(180deg, #3AA3FF 0%, #007AFF 50%, #0063D1 100%)",
-            height: "50px", fontSize: "17px",
-            boxShadow: "0 4px 20px rgba(0,122,255,0.45), inset 0 1px 0 rgba(255,255,255,0.28)",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            padding: "20px 22px 0",
           }}
         >
-          <Sparkles className="w-5 h-5" />
-          Сохранить и создать AI summary
-        </button>
-
-        <div className="glass-card p-4">
-          <p style={{ fontWeight: 600, fontSize: "13px", color: "#0a1628", marginBottom: "8px" }}>Советы</p>
-          <ul className="space-y-1.5">
-            {[
-              "Запиши голосовую — она автоматически расшифруется в текст",
-              "Упомяни ключевые темы и договорённости",
-              "AI создаст summary и напомнит написать через нужное время",
-            ].map((tip) => (
-              <li key={tip} className="flex gap-2" style={{ fontSize: "13px", color: "#8E8E93" }}>
-                <span style={{ color: "#007AFF" }}>·</span> {tip}
-              </li>
-            ))}
-          </ul>
+          <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />
+          <span
+            className="font-mono"
+            style={{
+              fontSize: 10,
+              color: "var(--faint)",
+              letterSpacing: "0.18em",
+              textTransform: "uppercase",
+            }}
+          >
+            ИЛИ
+          </span>
+          <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />
         </div>
+
+        {/* Text */}
+        <div style={{ padding: "16px 16px 0" }}>
+          <div style={cardStyle}>
+            <div className="eyebrow" style={{ marginBottom: 10 }}>
+              ТЕКСТОМ
+            </div>
+            <textarea
+              value={textNote}
+              onChange={(e) => setTextNote(e.target.value)}
+              placeholder="О чём говорили, что договорились…"
+              rows={5}
+              style={{
+                width: "100%",
+                background: "var(--bg)",
+                borderRadius: 12,
+                padding: "14px 16px",
+                minHeight: 100,
+                fontSize: 15,
+                color: "var(--ivory)",
+                lineHeight: 1.5,
+                border: "1px solid var(--line-soft)",
+                fontFamily: textNote ? "var(--sans)" : "var(--serif)",
+                fontStyle: textNote ? "normal" : "italic",
+                resize: "none",
+                outline: "none",
+              }}
+            />
+          </div>
+        </div>
+
+        {/* CTA */}
+        <div style={{ padding: "24px 22px 0" }}>
+          <SignalBtn
+            h={50}
+            onClick={handleSave}
+            disabled={(!textNote.trim() && !audioBlob) || isTranscribing}
+          >
+            <AISparkle size={14} color="var(--abyss)" />
+            Создать AI-сводку
+          </SignalBtn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatusScreen({
+  icon,
+  iconBg,
+  iconBorder,
+  title,
+  subtitle,
+  footer,
+}: {
+  icon: React.ReactNode;
+  iconBg: string;
+  iconBorder?: string;
+  title: string;
+  subtitle: string;
+  footer?: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "var(--bg)",
+        color: "var(--ivory)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "0 32px",
+        textAlign: "center",
+        position: "relative",
+      }}
+    >
+      <Atmosphere intensity={0.45} />
+      <div style={{ position: "relative", zIndex: 1 }}>
+        <div
+          style={{
+            width: 80,
+            height: 80,
+            borderRadius: "50%",
+            background: iconBg,
+            border: iconBorder,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            margin: "0 auto 22px",
+          }}
+        >
+          {icon}
+        </div>
+        <Hero size={26}>{title}</Hero>
+        <p
+          className="font-serif it text-muted-w"
+          style={{
+            fontSize: 15,
+            marginTop: 10,
+            lineHeight: 1.55,
+            maxWidth: 280,
+            marginInline: "auto",
+          }}
+        >
+          {subtitle}
+        </p>
+        {footer && <div style={{ marginTop: 24 }}>{footer}</div>}
       </div>
     </div>
   );

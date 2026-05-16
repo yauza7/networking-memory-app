@@ -78,13 +78,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const more = active.length > 10 ? `\n…и ещё ${active.length - 10}` : "";
     const text =
-      `🔔 <b>Напоминание W·52</b>\n\n` +
+      `🔔 <b>Echo · напоминание</b>\n\n` +
       `Сегодня нужно написать (${active.length}):\n\n${lines}${more}`;
 
     await sendBotMessage(user.chat_id, text, {
       inline_keyboard: [
-        [{ text: "✅ Открыть задачи", web_app: { url: `${APP_URL}/tasks` } }],
-        [{ text: "👥 Контакты", web_app: { url: `${APP_URL}/contacts` } }],
+        [{ text: "📡 Открыть Echo", web_app: { url: APP_URL } }],
       ],
     });
 

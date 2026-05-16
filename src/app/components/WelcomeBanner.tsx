@@ -24,10 +24,10 @@ export function WelcomeBanner() {
             className="w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0"
             style={{ background: "linear-gradient(135deg, #5AC8FA, #007AFF)" }}
           >
-            <span style={{ color: "white", fontSize: "13px", fontWeight: 700 }}>W</span>
+            <span style={{ color: "white", fontSize: "16px", fontWeight: 400, fontFamily: "'Instrument Serif', serif", letterSpacing: "-0.025em" }}>E<span style={{ color: "#5AC8FA" }}>.</span></span>
           </div>
           <p style={{ fontSize: "13px", color: "#3c3c43", flex: 1, lineHeight: 1.4 }}>
-            <span style={{ fontWeight: 600, color: "#0a1628" }}>W·52 Demo · </span>
+            <span style={{ fontWeight: 600, color: "#0a1628" }}>Echo Demo · </span>
             Прототип для обмена визитками — попробуйте QR, контакты и онбординг
           </p>
           <button

@@ -1,18 +1,39 @@
+/**
+ * W·52 — Новый контакт (AddContact)
+ * Moody. Поддерживает: ручной ввод, QR с decoded profile, и username-only.
+ */
 import { useState, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router";
-import { ArrowLeft, Check, UserCircle, User as UserIcon } from "lucide-react";
 import { motion } from "motion/react";
 import { addStoredContact } from "../utils/contactStore";
 import type { Connection, User } from "../utils/mockData";
+import {
+  Atmosphere,
+  Avatar,
+  Hero,
+  RoundBtn,
+  IvoryBtn,
+  SectionLabel,
+  cardStyle,
+} from "../components/brand/Brand";
 
 const PRESET_EVENTS = [
-  "МАС 2026", "Партнёркин", "WebMoney Forum", "AWA Bangkok", "Affiliate World Dubai",
+  "MAC'26", "GGate Conf'26", "BROCONF-7", "AffHub'26", "Telegram",
 ];
 
-const PRESET_TAGS = [
-  "iGaming", "Нутра", "Финансы", "Крипто", "E-commerce",
-  "Арбитраж", "Партнёрки", "Платёжки", "Media Buyer", "Affiliate Manager",
-  "SaaS", "AI", "Legal", "Аккаунты", "Агентство",
+const TAG_GROUPS = [
+  {
+    label: "Команда",
+    tags: ["Buying", "Платёжки", "Разработка", "Партнёрская сеть", "Прилы", "Аккаунты", "Трекеры", "HR", "PR", "Дизайн", "Конференции"],
+  },
+  {
+    label: "Трафик",
+    tags: ["FB", "UAC", "PPC", "SEO", "ASO", "TikTok Ads", "Influence", "Схемы", "Email", "SMS", "УБТ"],
+  },
+  {
+    label: "Вертикали",
+    tags: ["Нутра", "Gambling", "Betting", "Adult", "Финансы", "Crypto"],
+  },
 ];
 
 /** Decode the base64 profile payload from the QR URL `d` param */
@@ -35,26 +56,41 @@ function decodeProfilePayload(d: string): Partial<User> | null {
   }
 }
 
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "12px 14px",
+  background: "var(--deep)",
+  border: "1px solid var(--line-soft)",
+  borderRadius: 12,
+  color: "var(--ivory)",
+  fontFamily: "var(--sans)",
+  fontSize: 14,
+  outline: "none",
+  boxSizing: "border-box",
+};
+
 export function AddContact() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
   const username    = (searchParams.get("username") || "").replace(/^@/, "").slice(0, 32);
   const dParam      = searchParams.get("d") || "";
-  const noteParam   = (searchParams.get("note") || "").slice(0, 500);
   const eventParam  = (searchParams.get("event") || "").slice(0, 80);
 
-  // Decode full profile from QR payload (only present for W52-registered users)
   const decodedProfile = useMemo(() => dParam ? decodeProfilePayload(dParam) : null, [dParam]);
-
-  const isManual = !decodedProfile && !username;
+  // We always show the manual form unless we have a full decoded W·52 profile.
+  // Telegram-only scans pre-fill the username so the user just enters the actual name.
+  const showManualForm = !decodedProfile;
 
   const PRESET_EVENTS_SET = new Set(PRESET_EVENTS);
   const [event, setEvent]             = useState(eventParam && PRESET_EVENTS_SET.has(eventParam) ? eventParam : (eventParam ? "Другое" : ""));
   const [eventCustom, setEventCustom] = useState(eventParam && !PRESET_EVENTS_SET.has(eventParam) ? eventParam : "");
-  const [note, setNote]               = useState(noteParam);
-  const [manualName, setManualName]   = useState("");
-  const [manualUsername, setManualUsername] = useState("");
+
+  const [manualName, setManualName]         = useState("");
+  const [manualUsername, setManualUsername] = useState(username);
+  const [manualCompany, setManualCompany]   = useState("");
+  const [manualWebsite, setManualWebsite]   = useState("");
+
   const [selectedTags, setSelectedTags] = useState<string[]>(
     decodedProfile?.tags ?? []
   );
@@ -65,37 +101,45 @@ export function AddContact() {
 
   const effectiveEvent = event === "Другое" ? eventCustom : event;
 
+  const canSave = decodedProfile
+    ? true
+    : !!manualName.trim() && !!manualUsername.trim();
+
   const handleSave = () => {
     const contactId = `c-${Date.now()}`;
-
     const cleanManualUsername = manualUsername.replace(/^@/, "").slice(0, 32);
 
+    const links: { type: string; url: string }[] = [];
+    if (decodedProfile?.links) links.push(...decodedProfile.links);
+    else if (cleanManualUsername) links.push({ type: "telegram", url: `https://t.me/${cleanManualUsername}` });
+    else if (username) links.push({ type: "telegram", url: `https://t.me/${username}` });
+    if (manualWebsite.trim()) {
+      const url = manualWebsite.trim().startsWith("http")
+        ? manualWebsite.trim()
+        : `https://${manualWebsite.trim()}`;
+      links.push({ type: "website", url });
+    }
+
     const user: User = decodedProfile ? {
-      id:       `u-${Date.now()}`,
-      name:     decodedProfile.name    || username || "Новый контакт",
-      username: decodedProfile.username || username || undefined,
-      role:     decodedProfile.role    || "",
-      company:  decodedProfile.company || "",
-      photo:    decodedProfile.photo   || undefined,
-      tags:     selectedTags.length ? selectedTags : (decodedProfile.tags || []),
-      bio:      decodedProfile.bio     || undefined,
-      links:    decodedProfile.links   || (username ? [{ type: "telegram", url: `https://t.me/${username}` }] : []),
-    } : isManual ? {
-      id:       `u-${Date.now()}`,
-      name:     manualName.trim() || cleanManualUsername || "Новый контакт",
-      username: cleanManualUsername || undefined,
-      role:     "",
-      company:  "",
-      tags:     selectedTags,
-      links:    cleanManualUsername ? [{ type: "telegram", url: `https://t.me/${cleanManualUsername}` }] : [],
+      id:         `u-${Date.now()}`,
+      name:       decodedProfile.name     || manualName.trim() || "Новый контакт",
+      username:   decodedProfile.username || username || undefined,
+      role:       decodedProfile.role     || "",
+      company:    decodedProfile.company  || "",
+      companyUrl: (decodedProfile as any).companyUrl || undefined,
+      photo:      decodedProfile.photo    || undefined,
+      tags:       selectedTags.length ? selectedTags : (decodedProfile.tags || []),
+      bio:        decodedProfile.bio      || undefined,
+      links,
     } : {
-      id:       `u-${Date.now()}`,
-      name:     username || "Новый контакт",
-      username: username || undefined,
-      role:     "",
-      company:  "",
-      tags:     [],
-      links:    username ? [{ type: "telegram", url: `https://t.me/${username}` }] : [],
+      id:         `u-${Date.now()}`,
+      name:       manualName.trim() || "Новый контакт",
+      username:   cleanManualUsername || undefined,
+      role:       "",
+      company:    manualCompany.trim() || "",
+      companyUrl: manualWebsite.trim() || undefined,
+      tags:       selectedTags,
+      links,
     };
 
     const newContact: Connection = {
@@ -103,288 +147,257 @@ export function AddContact() {
       user,
       metAt:        new Date().toISOString(),
       event:        effectiveEvent || undefined,
-      note:         note.trim() || undefined,
       followUpSent: false,
     };
 
     addStoredContact(newContact);
-
-    // If a note was already provided (e.g., from bot /add), go straight to the contact card.
-    // Otherwise, prompt for a voice/text note as before.
-    if (note.trim()) {
-      navigate(`/contact/${contactId}`, { replace: true });
-    } else {
-      navigate(`/add-note?contact=${contactId}`, { replace: true });
-    }
+    navigate(`/add-note?contact=${contactId}`, { replace: true });
   };
 
   return (
-    <div className="min-h-screen pb-24">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 pt-14 pb-5">
-        <button onClick={() => navigate(-1)} style={{ color: "#007AFF" }}>
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <h1 style={{ fontSize: "26px", fontWeight: 700, color: "#0a1628", letterSpacing: "-0.4px" }}>
-          Новый контакт
-        </h1>
-      </div>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "var(--bg)",
+        color: "var(--ivory)",
+        position: "relative",
+        paddingBottom: 120,
+      }}
+    >
+      <Atmosphere intensity={0.3} />
 
-      <div className="px-4 space-y-4">
+      <div style={{ position: "relative", zIndex: 1 }}>
+        {/* Top */}
+        <div style={{ padding: "56px 18px 0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <RoundBtn onClick={() => navigate(-1)}>
+            <svg width="10" height="14" viewBox="0 0 10 14">
+              <path d="M8 1L2 7l6 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            </svg>
+          </RoundBtn>
+        </div>
 
-        {/* Manual entry form — shown when opening /add-contact directly (no QR data) */}
-        {isManual && (
-          <motion.div
-            className="glass-card p-5"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 }}
-          >
-            <div className="flex items-center gap-3 mb-4">
-              <div
-                className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
-                style={{ background: "linear-gradient(135deg, #5AC8FA, #007AFF)" }}
-              >
-                <UserIcon className="w-6 h-6 text-white" />
+        <div style={{ padding: "16px 22px 0" }}>
+          <Hero size={32}>Новый контакт</Hero>
+        </div>
+
+        {/* Decoded profile preview (from QR) */}
+        {decodedProfile && (
+          <div style={{ padding: "22px 16px 0" }}>
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              style={{ ...cardStyle, padding: 18 }}
+            >
+              <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
+                <Avatar
+                  name={decodedProfile.name || username || "?"}
+                  photo={decodedProfile.photo}
+                  username={decodedProfile.username || username}
+                  size={56}
+                  ring
+                />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <Hero size={20}>{decodedProfile.name || username}</Hero>
+                  {(decodedProfile.role || decodedProfile.company) && (
+                    <div className="text-muted-w" style={{ fontSize: 13, marginTop: 2, fontFamily: "var(--sans)" }}>
+                      {[decodedProfile.role, decodedProfile.company].filter(Boolean).join(" · ")}
+                    </div>
+                  )}
+                  {(decodedProfile.username || username) && (
+                    <div className="font-mono" style={{ fontSize: 11, color: "var(--signal-dim)", marginTop: 3, letterSpacing: "0.04em" }}>
+                      @{decodedProfile.username || username}
+                    </div>
+                  )}
+                </div>
               </div>
-              <p style={{ fontWeight: 600, fontSize: "16px", color: "#0a1628" }}>Новый контакт</p>
-            </div>
-            <div className="space-y-3">
+            </motion.div>
+          </div>
+        )}
+
+        {/* Manual fields (also shown for Telegram-only scans so the user can enter the real name) */}
+        {showManualForm && (
+          <div style={{ padding: "22px 16px 0" }}>
+            <div style={{ ...cardStyle, padding: 18, display: "flex", flexDirection: "column", gap: 14 }}>
               <div>
-                <p style={{ fontSize: "12px", fontWeight: 600, color: "#8E8E93", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>
+                <label className="eyebrow" style={{ display: "block", marginBottom: 8 }}>
                   Имя *
-                </p>
+                </label>
                 <input
                   type="text"
                   value={manualName}
                   onChange={(e) => setManualName(e.target.value.slice(0, 80))}
-                  placeholder="Имя Фамилия"
-                  className="w-full px-4 py-3 text-sm"
-                  style={{ borderRadius: "12px" }}
+                  placeholder="Иван Иванов"
+                  style={inputStyle}
                 />
               </div>
               <div>
-                <p style={{ fontSize: "12px", fontWeight: 600, color: "#8E8E93", textTransform: "uppercase", letterSpacing: "0.5px", marginBottom: "6px" }}>
-                  Telegram (необязательно)
-                </p>
+                <label className="eyebrow" style={{ display: "block", marginBottom: 8 }}>
+                  Telegram *
+                </label>
+                <div style={{ position: "relative" }}>
+                  <span
+                    style={{
+                      position: "absolute",
+                      left: 14,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      color: "var(--signal-dim)",
+                      fontFamily: "var(--sans)",
+                      fontSize: 14,
+                      pointerEvents: "none",
+                    }}
+                  >
+                    @
+                  </span>
+                  <input
+                    type="text"
+                    value={manualUsername}
+                    onChange={(e) => setManualUsername(e.target.value.replace(/^@/, "").slice(0, 32))}
+                    placeholder="username"
+                    style={{ ...inputStyle, paddingLeft: 28 }}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="eyebrow" style={{ display: "block", marginBottom: 8 }}>
+                  Компания
+                </label>
                 <input
                   type="text"
-                  value={manualUsername}
-                  onChange={(e) => setManualUsername(e.target.value.slice(0, 33))}
-                  placeholder="@username"
-                  className="w-full px-4 py-3 text-sm"
-                  style={{ borderRadius: "12px" }}
+                  value={manualCompany}
+                  onChange={(e) => setManualCompany(e.target.value.slice(0, 80))}
+                  placeholder="Название компании"
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label className="eyebrow" style={{ display: "block", marginBottom: 8 }}>
+                  Сайт компании
+                </label>
+                <input
+                  type="text"
+                  value={manualWebsite}
+                  onChange={(e) => setManualWebsite(e.target.value.slice(0, 200))}
+                  placeholder="example.com"
+                  style={inputStyle}
                 />
               </div>
             </div>
-          </motion.div>
+          </div>
         )}
 
-        {/* Profile card — decoded from W52 QR */}
-        {decodedProfile ? (
-          <motion.div
-            className="glass-card p-5"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 }}
-          >
-            <div className="flex items-center gap-4">
-              {decodedProfile.photo ? (
-                <img
-                  src={decodedProfile.photo}
-                  alt={decodedProfile.name}
-                  className="w-16 h-16 rounded-full object-cover flex-shrink-0 avatar-ocean"
-                />
-              ) : (
-                <div
-                  className="w-16 h-16 rounded-full flex items-center justify-center text-white text-2xl font-bold flex-shrink-0 avatar-ocean"
-                  style={{ background: "linear-gradient(135deg, #5AC8FA, #007AFF)" }}
-                >
-                  {decodedProfile.name ? decodedProfile.name[0].toUpperCase() : <UserCircle className="w-8 h-8" />}
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p style={{ fontWeight: 700, fontSize: "18px", color: "#0a1628" }}>
-                  {decodedProfile.name || username}
-                </p>
-                {(decodedProfile.role || decodedProfile.company) && (
-                  <p style={{ fontSize: "14px", color: "#8E8E93", marginTop: "2px" }}>
-                    {[decodedProfile.role, decodedProfile.company].filter(Boolean).join(" · ")}
-                  </p>
-                )}
-                {(decodedProfile.username || username) && (
-                  <p style={{ fontSize: "13px", color: "#007AFF", marginTop: "2px" }}>
-                    @{decodedProfile.username || username}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {decodedProfile.bio && (
-              <p className="mt-3 text-sm leading-relaxed p-3 rounded-xl"
-                style={{ background: "rgba(0,122,255,0.05)", color: "#3c3c43" }}>
-                {decodedProfile.bio}
-              </p>
-            )}
-
-            {decodedProfile.tags && decodedProfile.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1.5 mt-3">
-                {decodedProfile.tags.map((tag, i) => (
-                  <span key={i} className="ios-tag">{tag}</span>
-                ))}
-              </div>
-            )}
-          </motion.div>
-        ) : (
-          /* Username-only: just show who we're adding */
-          username ? (
-            <motion.div
-              className="glass-card p-4"
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.05 }}
-            >
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0 avatar-ocean"
-                  style={{ background: "linear-gradient(135deg, #5AC8FA, #007AFF)" }}
-                >
-                  {username[0]?.toUpperCase()}
-                </div>
-                <div>
-                  <p style={{ fontWeight: 600, fontSize: "16px", color: "#0a1628" }}>{username}</p>
-                  <p style={{ fontSize: "13px", color: "#007AFF" }}>@{username}</p>
-                </div>
-              </div>
-            </motion.div>
-          ) : null
-        )}
 
         {/* Event picker */}
-        <motion.div
-          className="glass-card p-5"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <p style={{ fontSize: "13px", fontWeight: 600, color: "#8E8E93", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-            Где познакомились?
-          </p>
-          <div className="flex flex-wrap gap-2 mt-3">
+        <div style={{ marginTop: 22 }}>
+          <SectionLabel>Где познакомились?</SectionLabel>
+          <div style={{ padding: "0 22px", display: "flex", flexWrap: "wrap", gap: 6 }}>
             {PRESET_EVENTS.map((ev) => (
               <button
                 key={ev}
                 onClick={() => setEvent((cur) => cur === ev ? "" : ev)}
-                className="px-3 py-1.5 rounded-full text-sm font-medium transition-all active:scale-95"
-                style={event === ev
-                  ? { background: "#007AFF", color: "#fff", boxShadow: "0 2px 8px rgba(0,122,255,0.3)" }
-                  : { background: "rgba(0,0,0,0.06)", color: "#3c3c43" }}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 100,
+                  background: event === ev ? "var(--ivory)" : "transparent",
+                  color: event === ev ? "var(--abyss)" : "var(--muted-fg)",
+                  fontFamily: "var(--mono)",
+                  fontSize: 11,
+                  letterSpacing: "0.04em",
+                  textTransform: "uppercase",
+                  border: "1px solid " + (event === ev ? "var(--ivory)" : "var(--line-soft)"),
+                  cursor: "pointer",
+                }}
               >
-                {event === ev && <Check className="w-3.5 h-3.5 inline mr-1" />}
                 {ev}
               </button>
             ))}
             <button
               onClick={() => setEvent((cur) => cur === "Другое" ? "" : "Другое")}
-              className="px-3 py-1.5 rounded-full text-sm font-medium transition-all active:scale-95"
-              style={event === "Другое"
-                ? { background: "#8E8E93", color: "#fff" }
-                : { background: "rgba(0,0,0,0.06)", color: "#3c3c43" }}
+              style={{
+                padding: "6px 12px",
+                borderRadius: 100,
+                background: event === "Другое" ? "var(--ivory)" : "transparent",
+                color: event === "Другое" ? "var(--abyss)" : "var(--muted-fg)",
+                fontFamily: "var(--mono)",
+                fontSize: 11,
+                letterSpacing: "0.04em",
+                textTransform: "uppercase",
+                border: "1px solid " + (event === "Другое" ? "var(--ivory)" : "var(--line-soft)"),
+                cursor: "pointer",
+              }}
             >
               Другое
             </button>
           </div>
           {event === "Другое" && (
-            <motion.input
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              value={eventCustom}
-              onChange={(e) => setEventCustom(e.target.value)}
-              placeholder="Название конференции или события"
-              className="w-full px-4 py-3 text-sm mt-3"
-            />
+            <div style={{ padding: "10px 22px 0" }}>
+              <input
+                type="text"
+                value={eventCustom}
+                onChange={(e) => setEventCustom(e.target.value)}
+                placeholder="Название события"
+                style={inputStyle}
+              />
+            </div>
           )}
-        </motion.div>
+        </div>
 
-        {/* Tag picker */}
-        <motion.div
-          className="glass-card p-5"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.11 }}
-        >
-          <p style={{ fontSize: "13px", fontWeight: 600, color: "#8E8E93", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-            Теги (сфера деятельности)
-          </p>
-          <div className="flex flex-wrap gap-2 mt-3">
-            {PRESET_TAGS.map((tag) => (
-              <button
-                key={tag}
-                onClick={() => toggleTag(tag)}
-                className="px-3 py-1.5 rounded-full text-sm font-medium transition-all active:scale-95"
-                style={selectedTags.includes(tag)
-                  ? { background: "#007AFF", color: "#fff", boxShadow: "0 2px 8px rgba(0,122,255,0.3)" }
-                  : { background: "rgba(0,0,0,0.06)", color: "#3c3c43" }}
-              >
-                {selectedTags.includes(tag) && <Check className="w-3.5 h-3.5 inline mr-1" />}
-                {tag}
-              </button>
+        {/* Tag picker — grouped */}
+        <div style={{ marginTop: 22 }}>
+          <SectionLabel>Теги</SectionLabel>
+          <div style={{ padding: "0 22px", display: "flex", flexDirection: "column", gap: 14 }}>
+            {TAG_GROUPS.map((group) => (
+              <div key={group.label}>
+                <div className="eyebrow" style={{ marginBottom: 6, color: "var(--signal-dim)" }}>
+                  {group.label}
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {group.tags.map((tag) => {
+                    const on = selectedTags.includes(tag);
+                    return (
+                      <button
+                        key={tag}
+                        onClick={() => toggleTag(tag)}
+                        style={{
+                          padding: "5px 10px",
+                          borderRadius: 100,
+                          background: on
+                            ? "oklch(0.86 0.13 195 / 0.18)"
+                            : "transparent",
+                          color: on ? "var(--signal)" : "var(--muted-fg)",
+                          border: `1px solid ${on ? "var(--signal-dim)" : "var(--line-soft)"}`,
+                          fontFamily: "var(--mono)",
+                          fontSize: 11,
+                          letterSpacing: "0.04em",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {on ? "✓ " : ""}{tag}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             ))}
           </div>
-        </motion.div>
-
-        {/* Note (pre-fillable from bot's /add command) */}
-        <motion.div
-          className="glass-card p-5"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.12 }}
-        >
-          <p style={{ fontSize: "13px", fontWeight: 600, color: "#8E8E93", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-            Заметка о встрече
-          </p>
-          <textarea
-            value={note}
-            onChange={(e) => setNote(e.target.value.slice(0, 500))}
-            placeholder="О чём говорили, что договорились…"
-            rows={3}
-            className="w-full px-4 py-3 text-sm resize-none mt-3"
-          />
-          <p style={{ fontSize: "12px", color: "#8E8E93", marginTop: "6px" }}>
-            {note.length}/500
-          </p>
-        </motion.div>
-
-        <motion.p
-          className="text-center px-2"
-          style={{ fontSize: "13px", color: "#8E8E93" }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.15 }}
-        >
-          {note.trim()
-            ? "Заметка сохранится с контактом"
-            : "После сохранения вы сможете записать голосовую заметку"}
-        </motion.p>
+        </div>
       </div>
 
       {/* Fixed CTA */}
       <div
-        className="fixed bottom-0 left-0 right-0 px-4 pt-4 pb-[max(16px,env(safe-area-inset-bottom))]"
-        style={{ background: "rgba(238,246,255,0.92)", backdropFilter: "blur(20px)", borderTop: "0.5px solid rgba(0,0,0,0.06)" }}
+        style={{
+          position: "fixed",
+          left: 0,
+          right: 0,
+          bottom: 0,
+          padding: "16px 22px max(16px, env(safe-area-inset-bottom))",
+          background: "linear-gradient(180deg, transparent, var(--bg) 35%)",
+          zIndex: 10,
+        }}
       >
-        <button
-          onClick={handleSave}
-          disabled={isManual && !manualName.trim() && !manualUsername.trim()}
-          className="w-full flex items-center justify-center gap-2 rounded-[14px] text-white font-semibold transition-all active:scale-97 disabled:opacity-50"
-          style={{
-            background: "linear-gradient(180deg, #3AA3FF 0%, #007AFF 50%, #0063D1 100%)",
-            height: "50px", fontSize: "17px",
-            boxShadow: "0 4px 20px rgba(0,122,255,0.45), inset 0 1px 0 rgba(255,255,255,0.28)",
-          }}
-        >
+        <IvoryBtn h={52} onClick={handleSave} disabled={!canSave}>
           Сохранить контакт
-        </button>
+        </IvoryBtn>
       </div>
     </div>
   );

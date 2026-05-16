@@ -1,7 +1,18 @@
+/**
+ * W·52 — Scanner
+ * Moody sonar viewfinder, одна широкая кнопка "Открыть сканер",
+ * подробная памятка-tips снизу.
+ */
 import { useState, useEffect, useRef, useCallback } from "react";
-import { QrCode, Camera, X, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router";
 import { motion } from "motion/react";
+import {
+  Sonar,
+  FreqBars,
+  RoundBtn,
+  Hero,
+  cardStyle,
+} from "../components/brand/Brand";
 
 type ScanState = "idle" | "scanning" | "done" | "error";
 
@@ -16,7 +27,9 @@ export function Scanner() {
   const [state, setState] = useState<ScanState>("idle");
   const [scannedValue, setScannedValue] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
-  const [hasTgScanner] = useState(() => !!(window as any).Telegram?.WebApp?.showScanQrPopup);
+  const [hasTgScanner] = useState(
+    () => !!(window as any).Telegram?.WebApp?.showScanQrPopup
+  );
   const [hasBarcodeDetector] = useState(() => "BarcodeDetector" in window);
 
   const stopCamera = useCallback(() => {
@@ -29,7 +42,6 @@ export function Scanner() {
 
   useEffect(() => () => stopCamera(), [stopCamera]);
 
-  // ── Telegram native scanner ─────────────────────────────
   const startTelegramScan = () => {
     const tg = (window as any).Telegram?.WebApp;
     setState("scanning");
@@ -40,37 +52,38 @@ export function Scanner() {
     });
   };
 
-  // ── Browser camera + BarcodeDetector ───────────────────
   const startCameraScan = async () => {
     setState("scanning");
     setErrorMsg("");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
       });
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
-
       if (hasBarcodeDetector) {
         try {
-          detectorRef.current = new (window as any).BarcodeDetector({ formats: ["qr_code"] });
+          detectorRef.current = new (window as any).BarcodeDetector({
+            formats: ["qr_code"],
+          });
         } catch {
           detectorRef.current = null;
         }
       }
-
       scanLoop();
     } catch (e: any) {
       stopCamera();
       setState("error");
-      if (e?.name === "NotAllowedError") {
+      if (e?.name === "NotAllowedError")
         setErrorMsg("Нет доступа к камере. Разрешите доступ в настройках браузера.");
-      } else {
-        setErrorMsg("Не удалось открыть камеру.");
-      }
+      else setErrorMsg("Не удалось открыть камеру.");
     }
   };
 
@@ -81,41 +94,33 @@ export function Scanner() {
       rafRef.current = requestAnimationFrame(scanLoop);
       return;
     }
-
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     ctx.drawImage(video, 0, 0);
-
     if (detectorRef.current) {
-      detectorRef.current.detect(canvas).then((codes: any[]) => {
-        if (codes.length > 0) {
-          handleResult(codes[0].rawValue);
-        } else {
+      detectorRef.current
+        .detect(canvas)
+        .then((codes: any[]) => {
+          if (codes.length > 0) handleResult(codes[0].rawValue);
+          else rafRef.current = requestAnimationFrame(scanLoop);
+        })
+        .catch(() => {
           rafRef.current = requestAnimationFrame(scanLoop);
-        }
-      }).catch(() => {
-        rafRef.current = requestAnimationFrame(scanLoop);
-      });
+        });
     } else {
-      // No BarcodeDetector – keep looping (camera stays open, just can't decode)
       rafRef.current = requestAnimationFrame(scanLoop);
     }
   }, []); // eslint-disable-line
 
-  /** Sanitize a string from an untrusted QR payload */
   const sanitizeStr = (v: unknown, max = 200): string =>
     typeof v === "string" ? v.replace(/[<>]/g, "").slice(0, max) : "";
-
-  /** Telegram usernames: 5-32 chars, alphanumeric + underscore */
   const sanitizeUsername = (v: unknown): string => {
     if (typeof v !== "string") return "";
     const cleaned = v.replace(/^@/, "").match(/^[a-zA-Z0-9_]{1,32}$/);
     return cleaned ? cleaned[0] : "";
   };
-
-  /** Try to decode the real name from a W52 QR `d` param */
   const decodeNameFromD = (d: string): string => {
     try {
       if (d.length > 4000) return "";
@@ -126,32 +131,27 @@ export function Scanner() {
       return "";
     }
   };
-
-  /** Extract display name + username from whatever was scanned */
   const parseScanned = (text: string): { display: string; username: string } => {
     try {
       const url = new URL(text);
       const segs = url.pathname.split("/").filter(Boolean);
       const d = url.searchParams.get("d") || "";
       const nameFromD = d ? decodeNameFromD(d) : "";
-
-      // W52 profile QR: /u/<username>
-      if (segs[0] === "u" && segs[1]) {
+      if (segs[0] === "u" && segs[1])
         return { display: nameFromD || segs[1], username: segs[1] };
-      }
-      // t.me/<username>
-      if (url.hostname === "t.me" && segs[0]) {
+      if (url.hostname === "t.me" && segs[0])
         return { display: nameFromD || segs[0], username: segs[0] };
-      }
       return { display: url.hostname, username: "" };
     } catch {
-      return { display: text.length > 40 ? text.slice(0, 40) + "…" : text, username: "" };
+      return {
+        display: text.length > 40 ? text.slice(0, 40) + "…" : text,
+        username: "",
+      };
     }
   };
 
   const handleResult = (text: string) => {
     stopCamera();
-    // Cap payload size to prevent UI/DoS issues from huge QR codes
     const safe = typeof text === "string" ? text.slice(0, 4000) : "";
     setScannedValue(safe);
     setState("done");
@@ -160,16 +160,14 @@ export function Scanner() {
   const handleSave = () => {
     let username = "";
     let d = "";
-
     try {
       const url = new URL(scannedValue);
       const segs = url.pathname.split("/").filter(Boolean);
       d = url.searchParams.get("d") || "";
-
       if (segs[0] === "u" && segs[1]) username = sanitizeUsername(segs[1]);
-      else if (url.hostname === "t.me" && segs[0]) username = sanitizeUsername(segs[0]);
+      else if (url.hostname === "t.me" && segs[0])
+        username = sanitizeUsername(segs[0]);
     } catch {}
-
     const params = new URLSearchParams();
     if (username) params.set("username", username);
     if (d) params.set("d", d);
@@ -184,219 +182,485 @@ export function Scanner() {
   };
 
   const startScan = () => {
-    if (hasTgScanner) {
-      startTelegramScan();
-    } else {
-      startCameraScan();
-    }
+    if (hasTgScanner) startTelegramScan();
+    else startCameraScan();
   };
 
+  const isLive = state === "scanning" && !hasTgScanner;
+
+  const tips = [
+    "Сканируй любой Telegram QR-код — даже без Echo-профиля.",
+    "Echo-визитки добавляют контакт со всеми данными сразу.",
+    hasTgScanner
+      ? "Нативный сканер Telegram — самый быстрый."
+      : hasBarcodeDetector
+      ? "QR определяется автоматически — просто наведи камеру."
+      : "Наведи камеру на QR и держи ровно.",
+    "Расстояние 15–25 см, хорошее освещение.",
+  ];
+
   return (
-    <div className="min-h-screen pb-20">
-      {/* Title */}
-      <div className="px-5 pt-14 pb-5">
-        <h1 style={{ fontSize: "34px", fontWeight: 700, color: "#0a1628", letterSpacing: "-0.5px" }}>
-          Сканировать
-        </h1>
-        <p style={{ fontSize: "15px", color: "#8E8E93", marginTop: "4px" }}>
-          Наведите камеру на QR-код собеседника
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "var(--bg)",
+        color: "var(--ivory)",
+        paddingBottom: 120,
+        position: "relative",
+        overflow: "hidden",
+      }}
+    >
+      {/* atmospheric glow */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background:
+            "radial-gradient(60% 50% at 50% 38%, oklch(0.22 0.05 200 / 0.6), transparent 70%)",
+          pointerEvents: "none",
+        }}
+      />
+
+      {/* header */}
+      <div
+        style={{
+          padding: "60px 18px 0",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          position: "relative",
+          zIndex: 2,
+        }}
+      >
+        <RoundBtn onClick={() => navigate(-1)}>
+          <svg width="10" height="14" viewBox="0 0 10 14">
+            <path
+              d="M8 1L2 7l6 6"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fill="none"
+            />
+          </svg>
+        </RoundBtn>
+        <span
+          className="font-mono"
+          style={{
+            fontSize: 11,
+            color: "var(--muted-fg)",
+            letterSpacing: "0.16em",
+            textTransform: "uppercase",
+          }}
+        >
+          Сканер
+        </span>
+        <div style={{ width: 38 }} />
+      </div>
+
+      {/* hero text */}
+      <div
+        style={{
+          textAlign: "center",
+          padding: "20px 28px 0",
+          position: "relative",
+          zIndex: 2,
+        }}
+      >
+        <Hero size={26}>Сканировать QR</Hero>
+        <p
+          className="font-serif it text-muted-w"
+          style={{
+            fontSize: 14.5,
+            marginTop: 6,
+            lineHeight: 1.5,
+            maxWidth: 280,
+            marginInline: "auto",
+          }}
+        >
+          Наведи камеру на QR-код собеседника.
         </p>
       </div>
 
-      {/* Viewfinder */}
-      <div className="px-4 mb-5">
+      {/* viewfinder */}
+      <div
+        style={{
+          marginTop: 24,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          padding: "0 24px",
+          position: "relative",
+          zIndex: 2,
+        }}
+      >
         <div
-          className="relative aspect-square rounded-3xl overflow-hidden"
           style={{
-            background: state === "idle"
-              ? "linear-gradient(135deg, rgba(0,122,255,0.08) 0%, rgba(90,200,250,0.12) 100%)"
-              : "#0a0a0a",
-            border: state === "idle" ? "0.5px solid rgba(0,122,255,0.18)" : "none",
+            position: "relative",
+            width: 260,
+            height: 260,
+            borderRadius: 24,
+            border: "1px solid var(--line)",
+            background: "oklch(0.16 0.025 230)",
+            overflow: "hidden",
           }}
         >
-          {/* Video stream */}
           <video
             ref={videoRef}
-            className="absolute inset-0 w-full h-full object-cover"
             playsInline
             muted
-            style={{ display: state === "scanning" && !hasTgScanner ? "block" : "none" }}
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              display: isLive ? "block" : "none",
+            }}
           />
-          <canvas ref={canvasRef} className="hidden" />
+          <canvas ref={canvasRef} style={{ display: "none" }} />
 
-          {/* Idle overlay */}
-          {state === "idle" && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <div className="w-52 h-52 relative">
-                {[
-                  "top-0 left-0 border-t-[3px] border-l-[3px] rounded-tl-2xl",
-                  "top-0 right-0 border-t-[3px] border-r-[3px] rounded-tr-2xl",
-                  "bottom-0 left-0 border-b-[3px] border-l-[3px] rounded-bl-2xl",
-                  "bottom-0 right-0 border-b-[3px] border-r-[3px] rounded-br-2xl",
-                ].map((cls, i) => (
-                  <div key={i} className={`absolute w-9 h-9 ${cls}`} style={{ borderColor: "#007AFF" }} />
-                ))}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <QrCode className="w-16 h-16" style={{ color: "rgba(0,122,255,0.3)" }} />
-                </div>
-              </div>
-              <p style={{ color: "#8E8E93", fontSize: "14px", marginTop: "20px", fontWeight: 500 }}>
-                Нажмите «Включить камеру»
-              </p>
-            </div>
-          )}
+          {/* corner brackets */}
+          {[
+            { top: 10, left: 10, r: "0deg" },
+            { top: 10, right: 10, r: "90deg" },
+            { bottom: 10, right: 10, r: "180deg" },
+            { bottom: 10, left: 10, r: "270deg" },
+          ].map((c, i) => (
+            <div
+              key={i}
+              style={{
+                position: "absolute",
+                top: c.top,
+                left: c.left,
+                right: c.right,
+                bottom: c.bottom,
+                width: 28,
+                height: 28,
+                transform: `rotate(${c.r})`,
+                borderTop: "2px solid var(--signal)",
+                borderLeft: "2px solid var(--signal)",
+              }}
+            />
+          ))}
 
-          {/* Scanning overlay (camera mode) */}
-          {state === "scanning" && !hasTgScanner && (
-            <motion.div
-              className="absolute inset-0 pointer-events-none"
-              style={{ border: "3px solid rgba(52,199,89,0.8)", borderRadius: "24px" }}
+          {/* sonar (when not live) */}
+          {!isLive && state !== "done" && (
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
             >
-              <motion.div
-                className="absolute left-0 right-0 h-0.5"
-                style={{ background: "linear-gradient(90deg, transparent, #34C759, transparent)" }}
-                animate={{ top: ["5%", "95%"] }}
-                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-              />
-              <div
-                className="absolute bottom-3 left-0 right-0 flex items-center justify-center"
-                style={{ color: "rgba(255,255,255,0.7)", fontSize: "13px" }}
-              >
-                {hasBarcodeDetector ? "Сканирование…" : "Камера готова — наведите на QR"}
-              </div>
-            </motion.div>
-          )}
-
-          {/* Scanning overlay (Telegram mode) */}
-          {state === "scanning" && hasTgScanner && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1.2, repeat: Infinity, ease: "linear" }}
-              >
-                <RefreshCw className="w-12 h-12" style={{ color: "#34C759" }} />
-              </motion.div>
-              <p style={{ color: "rgba(255,255,255,0.6)", fontSize: "14px", marginTop: "16px" }}>
-                Открывается нативный сканер…
-              </p>
+              <Sonar size={220} rings={5} opacity={0.6} />
             </div>
           )}
 
-          {/* Done overlay */}
-          {state === "done" && (() => {
-            const { display } = parseScanned(scannedValue);
-            return (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="absolute inset-0 flex flex-col items-center justify-center p-8"
-                style={{ background: "#34C759" }}
-              >
-                <div
-                  className="w-20 h-20 rounded-full flex items-center justify-center mb-4"
-                  style={{ background: "rgba(255,255,255,0.25)" }}
-                >
-                  <svg className="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-                <h3 style={{ fontSize: "20px", fontWeight: 700, color: "white", marginBottom: "6px" }}>
-                  QR считан!
-                </h3>
-                <p style={{ color: "rgba(255,255,255,0.9)", fontSize: "18px", fontWeight: 600, marginBottom: "20px" }}>
-                  {display}
-                </p>
-                <button
-                  onClick={handleSave}
-                  className="w-full rounded-[14px] font-semibold transition-all active:scale-97"
-                  style={{ background: "rgba(255,255,255,0.9)", color: "#34C759", height: "50px", fontSize: "17px" }}
-                >
-                  Сохранить контакт
-                </button>
-              </motion.div>
-            );
-          })()}
+          {/* sweep line */}
+          {(state === "idle" || isLive) && (
+            <motion.div
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                height: 1,
+                background:
+                  "linear-gradient(90deg, transparent, var(--signal), transparent)",
+                boxShadow: "0 0 12px var(--signal)",
+              }}
+              animate={{ top: ["10%", "90%", "10%"] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+            />
+          )}
 
-          {/* Error overlay */}
+          {/* DONE overlay */}
+          {state === "done" &&
+            (() => {
+              const { display } = parseScanned(scannedValue);
+              return (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    padding: "0 22px",
+                    textAlign: "center",
+                    background: "oklch(0.18 0.04 200 / 0.95)",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: 64,
+                      height: 64,
+                      borderRadius: "50%",
+                      background: "var(--signal)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      marginBottom: 14,
+                      boxShadow: "0 0 24px oklch(0.86 0.13 195 / 0.55)",
+                    }}
+                  >
+                    <svg
+                      width="28"
+                      height="28"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="var(--abyss)"
+                      strokeWidth="2.5"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  </div>
+                  <span className="eyebrow" style={{ color: "var(--signal)" }}>
+                    SIGNAL RECEIVED
+                  </span>
+                  <p
+                    className="font-serif"
+                    style={{
+                      fontSize: 20,
+                      marginTop: 8,
+                      color: "var(--ivory)",
+                      lineHeight: 1.2,
+                    }}
+                  >
+                    {display}
+                  </p>
+                </motion.div>
+              );
+            })()}
+
+          {/* ERROR overlay */}
           {state === "error" && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center">
-              <div className="w-16 h-16 rounded-full flex items-center justify-center mb-3" style={{ background: "rgba(255,59,48,0.15)" }}>
-                <X className="w-8 h-8" style={{ color: "#FF3B30" }} />
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: "0 22px",
+                textAlign: "center",
+              }}
+            >
+              <div
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: "50%",
+                  background: "oklch(0.68 0.19 25 / 0.15)",
+                  border: "1px solid var(--danger)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginBottom: 12,
+                }}
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M6 6l12 12M18 6L6 18"
+                    stroke="var(--danger)"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                </svg>
               </div>
-              <p style={{ color: "white", fontSize: "15px", fontWeight: 600, marginBottom: "8px" }}>Ошибка камеры</p>
-              <p style={{ color: "rgba(255,255,255,0.6)", fontSize: "13px" }}>{errorMsg}</p>
+              <p style={{ fontSize: 15, fontWeight: 500 }}>Ошибка камеры</p>
+              <p
+                className="text-faint"
+                style={{ fontSize: 13, marginTop: 6, maxWidth: 220 }}
+              >
+                {errorMsg}
+              </p>
             </div>
           )}
         </div>
+
+        {/* SINGLE wide button */}
+        <div style={{ marginTop: 22, width: "100%" }}>
+          {(state === "idle" || state === "error") && (
+            <button
+              onClick={startScan}
+              style={{
+                width: "100%",
+                height: 54,
+                borderRadius: 16,
+                background: "var(--signal)",
+                color: "var(--abyss)",
+                border: "none",
+                fontFamily: "var(--sans)",
+                fontSize: 15,
+                fontWeight: 500,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 10,
+                boxShadow: "0 4px 24px oklch(0.86 0.13 195 / 0.30)",
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 18 18" fill="none">
+                <path
+                  d="M2 5V2h3M13 2h3v3M16 13v3h-3M5 16H2v-3"
+                  stroke="var(--abyss)"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+                <rect x="5" y="6" width="2.5" height="2.5" stroke="var(--abyss)" strokeWidth="1.4" fill="none" />
+                <rect x="10.5" y="6" width="2.5" height="2.5" stroke="var(--abyss)" strokeWidth="1.4" fill="none" />
+                <rect x="5" y="9.5" width="2.5" height="2.5" stroke="var(--abyss)" strokeWidth="1.4" fill="none" />
+                <rect x="10.5" y="9.5" width="1.1" height="1.1" fill="var(--abyss)" />
+                <rect x="12" y="11.5" width="1" height="1" fill="var(--abyss)" />
+              </svg>
+              Открыть сканер
+            </button>
+          )}
+          {state === "scanning" && !hasTgScanner && (
+            <button
+              onClick={reset}
+              style={{
+                width: "100%",
+                height: 54,
+                borderRadius: 16,
+                background: "var(--surface)",
+                color: "var(--ivory)",
+                border: "1px solid var(--line-soft)",
+                fontFamily: "var(--sans)",
+                fontSize: 15,
+                fontWeight: 500,
+                cursor: "pointer",
+              }}
+            >
+              Отменить
+            </button>
+          )}
+          {state === "done" && (
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={reset}
+                style={{
+                  flex: 1,
+                  height: 50,
+                  borderRadius: 14,
+                  background: "var(--surface)",
+                  color: "var(--ivory)",
+                  border: "1px solid var(--line-soft)",
+                  fontFamily: "var(--sans)",
+                  fontSize: 14,
+                  cursor: "pointer",
+                }}
+              >
+                Ещё
+              </button>
+              <button
+                onClick={handleSave}
+                style={{
+                  flex: 2,
+                  height: 50,
+                  borderRadius: 14,
+                  background: "var(--ivory)",
+                  color: "var(--abyss)",
+                  border: "none",
+                  fontFamily: "var(--sans)",
+                  fontSize: 14,
+                  fontWeight: 500,
+                  cursor: "pointer",
+                }}
+              >
+                Сохранить контакт
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* TIPS */}
+        <div style={{ ...cardStyle, marginTop: 24, padding: "16px 18px", width: "100%" }}>
+          <div className="eyebrow" style={{ marginBottom: 10 }}>
+            КАК ОТСКАНИРОВАТЬ
+          </div>
+          <ul
+            style={{
+              listStyle: "none",
+              padding: 0,
+              margin: 0,
+              display: "flex",
+              flexDirection: "column",
+              gap: 8,
+            }}
+          >
+            {tips.map((tip, i) => (
+              <li
+                key={i}
+                style={{
+                  display: "flex",
+                  gap: 10,
+                  fontFamily: "var(--sans)",
+                  fontSize: 13,
+                  color: "var(--muted-fg)",
+                  lineHeight: 1.5,
+                }}
+              >
+                <span
+                  className="font-mono"
+                  style={{
+                    color: "var(--signal-dim)",
+                    fontSize: 11,
+                    minWidth: 18,
+                  }}
+                >
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                {tip}
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
 
-      {/* Actions */}
-      <div className="px-4 space-y-2.5 mb-5">
-        {(state === "idle" || state === "error") && (
-          <button
-            onClick={startScan}
-            className="w-full flex items-center justify-center gap-2 rounded-[14px] text-white font-semibold transition-all active:scale-97"
-            style={{
-              background: "linear-gradient(180deg, #3AA3FF 0%, #007AFF 50%, #0063D1 100%)",
-              height: "50px", fontSize: "17px",
-              boxShadow: "0 4px 20px rgba(0,122,255,0.45), inset 0 1px 0 rgba(255,255,255,0.28)",
-            }}
-          >
-            <Camera className="w-5 h-5" />
-            {hasTgScanner ? "Открыть сканер" : "Включить камеру"}
-          </button>
-        )}
-
-        {state === "scanning" && !hasTgScanner && (
-          <button
-            onClick={reset}
-            className="w-full flex items-center justify-center gap-2 rounded-[14px] font-semibold transition-all active:scale-97"
-            style={{
-              background: "rgba(255,255,255,0.72)",
-              backdropFilter: "blur(20px)",
-              border: "0.5px solid rgba(0,0,0,0.1)",
-              color: "#FF3B30", height: "50px", fontSize: "17px",
-            }}
-          >
-            <X className="w-5 h-5" /> Отменить
-          </button>
-        )}
-
-        {state === "done" && (
-          <button
-            onClick={reset}
-            className="w-full rounded-[14px] font-semibold transition-all active:scale-97"
-            style={{
-              background: "rgba(255,255,255,0.72)",
-              backdropFilter: "blur(20px)",
-              border: "0.5px solid rgba(0,0,0,0.1)",
-              color: "#007AFF", height: "50px", fontSize: "17px",
-            }}
-          >
-            Сканировать ещё
-          </button>
-        )}
-      </div>
-
-      {/* Tips */}
-      <div className="mx-4 glass-card p-4">
-        <p style={{ fontWeight: 600, fontSize: "14px", color: "#0a1628", marginBottom: "10px" }}>Советы</p>
-        <ul className="space-y-2">
-          {[
-            hasTgScanner
-              ? "Используется нативный сканер Telegram — самый быстрый"
-              : hasBarcodeDetector
-                ? "QR-код определяется автоматически без нажатий"
-                : "Наведите камеру точно на QR-код и держите ровно",
-            "Держите камеру на расстоянии 15–25 см",
-            "Убедитесь, что QR-код хорошо освещён",
-          ].map((tip) => (
-            <li key={tip} className="flex gap-2" style={{ fontSize: "13px", color: "#8E8E93" }}>
-              <span style={{ color: "#007AFF" }}>·</span>
-              {tip}
-            </li>
-          ))}
-        </ul>
+      {/* bottom hz strip */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: 90,
+          left: 22,
+          right: 22,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          zIndex: 1,
+          pointerEvents: "none",
+          opacity: 0.55,
+        }}
+      >
+        <span
+          className="font-mono"
+          style={{
+            fontSize: 9.5,
+            color: "var(--faint)",
+            letterSpacing: "0.18em",
+            textTransform: "uppercase",
+          }}
+        >
+          Sweeping · 52.000 Hz
+        </span>
+        <FreqBars
+          strength={state === "scanning" ? 0.7 : 0.35}
+          count={10}
+          height={9}
+        />
       </div>
     </div>
   );

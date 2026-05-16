@@ -108,40 +108,28 @@ async function transcribeVoice(fileId: string): Promise<string | null> {
   }
 }
 
-/** Open-App inline keyboard used as a default response */
+/** Open-App inline keyboard — used everywhere as the single CTA */
 function openAppKeyboard() {
-  return [[{ text: "🚀 Открыть W·52", web_app: { url: APP_URL } }]];
+  return [[{ text: "📡 Открыть Echo", web_app: { url: APP_URL } }]];
 }
 
-/** Full menu inline keyboard */
+/** Main keyboard — minimal: just one button to open the app */
 function mainMenuKeyboard() {
-  return [
-    [
-      { text: "🔍 Сканировать", web_app: { url: `${APP_URL}/scan` } },
-      { text: "📇 Профиль", web_app: { url: `${APP_URL}/my-card` } },
-    ],
-    [
-      { text: "👥 Контакты", web_app: { url: `${APP_URL}/contacts` } },
-      { text: "✅ Задачи", web_app: { url: `${APP_URL}/tasks` } },
-    ],
-    [{ text: "🚀 Открыть W·52", web_app: { url: APP_URL } }],
-  ];
+  return openAppKeyboard();
 }
 
 const HELP_TEXT =
-  "<b>Команды W·52</b>\n\n" +
+  "<b>Echo · команды</b>\n" +
+  "<i>Every signal finds its receiver.</i>\n\n" +
   "📇 /share — поделиться своей визиткой\n" +
   "➕ /add @username заметка — быстро записать контакт\n" +
-  "🔍 /scan — открыть QR-сканер\n" +
-  "👥 /contacts — мои контакты\n" +
-  "✅ /tasks — мои задачи\n" +
-  "👤 /profile — мой профиль\n" +
+  "🎙️ Голосовое — пришли голосовое, расшифрую и прикреплю к контакту\n" +
   "ℹ️ /help — эта справка\n\n" +
-  "<b>Совет:</b> Если связь плохая на конференции — просто пиши боту " +
-  "<code>/add @user о чём говорили</code> — потом откроешь приложение и всё сохранится.";
+  "<b>Совет:</b> Плохая связь на конференции? Пиши боту " +
+  "<code>/add @user о чём говорили</code> — синхронизируется когда откроешь приложение.";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== "POST") return res.status(200).send("W·52 Bot is running");
+  if (req.method !== "POST") return res.status(200).send("Echo Bot is running");
 
   if (!TOKEN) {
     console.error("TELEGRAM_BOT_TOKEN is not set");
@@ -170,19 +158,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           {
             type: "article",
             id: "share_card",
-            title: senderUsername ? "Моя визитка W·52" : "Открыть W·52",
+            title: senderUsername ? "Моя визитка Echo" : "Открыть Echo",
             description: senderUsername
               ? "Отправить визитку в этот чат"
-              : "Нетворкинг и обмен визитками",
+              : "Every signal finds its receiver.",
             input_message_content: {
               message_text: senderUsername
-                ? `📇 <b>Моя визитка W·52</b>\n${profileUrl}`
-                : `🌊 <b>W·52</b> — приложение для нетворкинга`,
+                ? `📇 <b>Моя визитка · Echo</b>\n${profileUrl}`
+                : `<b>Echo.</b> <i>Every signal finds its receiver.</i>`,
               parse_mode: "HTML",
             },
             reply_markup: {
               inline_keyboard: [[
-                { text: senderUsername ? "Открыть визитку" : "Открыть W·52", web_app: { url: profileUrl } },
+                { text: senderUsername ? "Открыть визитку" : "📡 Открыть Echo", web_app: { url: profileUrl } },
               ]],
             },
           },
@@ -210,19 +198,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await sendMessage(chatId, HELP_TEXT, { reply_markup: { inline_keyboard: mainMenuKeyboard() } });
       } else if (data === "about") {
         await sendMessage(chatId,
-          `🌊 <b>W·52</b>\n\n` +
-          `Умный нетворкинг для конференций. Помогаем не терять контакты после встреч и автоматически напоминаем написать.\n\n` +
-          `<b>Особенности:</b>\n` +
+          `<b>Echo.</b>\n` +
+          `<i>Every signal finds its receiver.</i>\n\n` +
+          `Нетворкинг-память для конференций. Один сигнал — и контакт уже у тебя.\n\n` +
+          `<b>Что внутри:</b>\n` +
           `• Обмен визитками через QR\n` +
           `• AI-резюме каждого контакта\n` +
           `• Follow-up напоминания\n` +
-          `• Голосовые заметки\n` +
-          `• Работает офлайн (через бота)\n\n` +
-          `<i>Версия 1.1</i>`,
+          `• Голосовые заметки с расшифровкой\n` +
+          `• Работает офлайн через бота\n\n` +
+          `<code>WHALE · 52 HZ</code>`,
           { reply_markup: { inline_keyboard: openAppKeyboard() } }
         );
       } else if (data === "menu") {
-        await sendMessage(chatId, "Главное меню:", { reply_markup: { inline_keyboard: mainMenuKeyboard() } });
+        await sendMessage(chatId, "Echo.", { reply_markup: { inline_keyboard: mainMenuKeyboard() } });
       }
       return res.status(200).json({ ok: true });
     }
@@ -230,15 +219,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ─── /start ───────────────────────────────────────────
     if (text === "/start" || text.startsWith("/start ")) {
       await sendMessage(chatId,
-        `👋 Привет, <b>${firstName}</b>!\n\n` +
-        `<b>W·52</b> — нетворкинг-помощник для конференций.\n\n` +
-        `Обменивайся визитками через QR, не теряй контакты, получай follow-up напоминания.\n\n` +
-        `Жми кнопки ниже или используй команды — посмотри /help.`,
+        `👋 Привет, <b>${firstName}</b>.\n\n` +
+        `<b>Echo.</b> <i>Every signal finds its receiver.</i>\n\n` +
+        `Нетворкинг-память для конференций: обмен QR-визитками, AI-сводки и follow-up напоминания.\n\n` +
+        `Открой приложение или пришли голосовое — я расшифрую.`,
         {
           reply_markup: {
             inline_keyboard: [
               ...mainMenuKeyboard(),
-              [{ text: "ℹ️ Помощь", callback_data: "help" }, { text: "📖 О приложении", callback_data: "about" }],
+              [{ text: "ℹ️ Помощь", callback_data: "help" }, { text: "📖 О Echo", callback_data: "about" }],
             ],
           },
         }
@@ -262,14 +251,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       } else {
         const profileUrl = `${APP_URL}/u/${senderUsername}`;
         await sendMessage(chatId,
-          `📇 <b>Твоя визитка W·52</b>\n\n` +
+          `📇 <b>Твоя визитка Echo</b>\n\n` +
           `<code>${escapeHtml(profileUrl)}</code>\n\n` +
-          `Перешли это сообщение или нажми кнопку — собеседник откроет твою визитку и добавит в контакты в один клик.`,
+          `Перешли это сообщение или нажми кнопку — собеседник откроет визитку и добавит в контакты в один клик.`,
           {
             reply_markup: {
               inline_keyboard: [
                 [{ text: "📤 Поделиться визиткой", switch_inline_query: "" }],
-                [{ text: "📇 Открыть мою визитку", web_app: { url: `${APP_URL}/my-card` } }],
+                [{ text: "📡 Открыть Echo", web_app: { url: APP_URL } }],
               ],
             },
           }
@@ -308,11 +297,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               `💾 <b>Сохранить контакт</b>\n\n` +
               `Telegram: @${escapeHtml(username)}\n` +
               (note ? `\n<i>${escapeHtml(note)}</i>\n` : "") +
-              `\nНажми чтобы сохранить в W·52:`,
+              `\nНажми чтобы сохранить в Echo:`,
               {
                 reply_markup: {
                   inline_keyboard: [
-                    [{ text: "💾 Сохранить в W·52", web_app: { url } }],
+                    [{ text: "💾 Сохранить в Echo", web_app: { url } }],
                     [{ text: "✍️ Добавить ещё", switch_inline_query_current_chat: "" }],
                   ],
                 },
@@ -321,45 +310,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
         }
       }
-    }
-
-    // ─── /scan ────────────────────────────────────────────
-    else if (text === "/scan") {
-      await sendMessage(chatId,
-        `🔍 <b>Сканер QR</b>\n\nОткрой камеру и наведи на QR-код собеседника:`,
-        { reply_markup: { inline_keyboard: [[{ text: "🔍 Открыть сканер", web_app: { url: `${APP_URL}/scan` } }]] } }
-      );
-    }
-
-    // ─── /contacts ────────────────────────────────────────
-    else if (text === "/contacts") {
-      await sendMessage(chatId,
-        `👥 <b>Контакты</b>\n\nОткрой список всех сохранённых контактов:`,
-        { reply_markup: { inline_keyboard: [[{ text: "👥 Открыть контакты", web_app: { url: `${APP_URL}/contacts` } }]] } }
-      );
-    }
-
-    // ─── /tasks ───────────────────────────────────────────
-    else if (text === "/tasks") {
-      await sendMessage(chatId,
-        `✅ <b>Задачи</b>\n\nFollow-up напоминания и задачи по контактам:`,
-        { reply_markup: { inline_keyboard: [[{ text: "✅ Открыть задачи", web_app: { url: `${APP_URL}/tasks` } }]] } }
-      );
-    }
-
-    // ─── /profile ─────────────────────────────────────────
-    else if (text === "/profile" || text === "/me") {
-      await sendMessage(chatId,
-        `👤 <b>Мой профиль</b>\n\nКарточка W·52 — её ты показываешь по QR:`,
-        {
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: "📇 Открыть профиль", web_app: { url: `${APP_URL}/my-card` } }],
-              [{ text: "✏️ Редактировать", web_app: { url: `${APP_URL}/edit-profile` } }],
-            ],
-          },
-        }
-      );
     }
 
     // ─── Voice message ────────────────────────────────────
@@ -395,7 +345,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               reply_markup: {
                 inline_keyboard: [
                   [{ text: "💾 Сохранить к контакту", web_app: { url } }],
-                  [{ text: "👥 Открыть контакты", web_app: { url: `${APP_URL}/contacts` } }],
                 ],
               },
             }
@@ -419,8 +368,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     else if (update.message?.photo) {
       await sendMessage(chatId,
         `📷 <b>Получил фото</b>\n\n` +
-        `Чтобы отсканировать QR-код — открой сканер в приложении (он работает быстрее, чем разбор фото):`,
-        { reply_markup: { inline_keyboard: [[{ text: "🔍 Открыть сканер", web_app: { url: `${APP_URL}/scan` } }]] } }
+        `QR-коды быстрее распознаются прямо в приложении — открой Echo и наведи камеру:`,
+        { reply_markup: { inline_keyboard: openAppKeyboard() } }
       );
     }
 
@@ -437,8 +386,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         `📇 <b>Получил контакт</b>\n\n` +
         (name ? `${name}\n` : "") +
         (c.phone_number ? `📞 ${escapeHtml(c.phone_number)}\n` : "") +
-        `\nДобавить в W·52?`,
-        { reply_markup: { inline_keyboard: [[{ text: "💾 Сохранить в W·52", web_app: { url } }]] } }
+        `\nДобавить в Echo?`,
+        { reply_markup: { inline_keyboard: [[{ text: "💾 Сохранить в Echo", web_app: { url } }]] } }
       );
     }
 
@@ -466,8 +415,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         {
           reply_markup: {
             inline_keyboard: redisConfigured
-              ? [[{ text: "💾 Прикрепить к контакту", web_app: { url } }],
-                 [{ text: "👥 Контакты", web_app: { url: `${APP_URL}/contacts` } }]]
+              ? [[{ text: "💾 Прикрепить к контакту", web_app: { url } }]]
               : mainMenuKeyboard(),
           },
         }

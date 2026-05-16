@@ -18,7 +18,7 @@ const PRESET_TAGS = [
 ];
 
 const PRESET_EVENTS = [
-  "МАС 2026", "Партнёркин", "WebMoney Forum", "AWA Bangkok", "Affiliate World Dubai",
+  "MAC'26", "GGate Conf'26", "BROCONF-7", "AffHub'26", "Telegram",
 ];
 
 const TASK_TYPE_CONFIG: Record<string, { icon: React.ReactNode; color: string; bg: string; label: string }> = {

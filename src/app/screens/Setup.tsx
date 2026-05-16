@@ -1,11 +1,32 @@
+/**
+ * W·52 — Setup (Onboarding "Настройте профиль")
+ * Moody. Sonar + whale mark, mono eyebrows for fields, ivory CTA.
+ */
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import { saveCurrentUser } from "../utils/userStore";
+import {
+  Atmosphere,
+  Sonar,
+  W52Mark,
+  CoordLine,
+  IvoryBtn,
+  GhostBtn,
+  Hero,
+} from "../components/brand/Brand";
 
 const PRESET_TAGS = [
-  "Арбитраж", "Партнёрки", "Партнёрские сети", "Платёжки",
-  "Аккаунты", "Агентские", "AI/Tech", "Media Buying", "Crypto", "iGaming",
+  "Арбитраж",
+  "Партнёрки",
+  "Партнёрские сети",
+  "Платёжки",
+  "Аккаунты",
+  "Агентские",
+  "AI/Tech",
+  "Media Buying",
+  "Crypto",
+  "iGaming",
 ];
 
 export function Setup({ onComplete }: { onComplete?: () => void } = {}) {
@@ -21,7 +42,6 @@ export function Setup({ onComplete }: { onComplete?: () => void } = {}) {
     tags: [] as string[],
   });
 
-  // Pre-fill from Telegram if available
   useEffect(() => {
     const tg = (window as any).Telegram?.WebApp;
     const tgUser = tg?.initDataUnsafe?.user;
@@ -37,16 +57,25 @@ export function Setup({ onComplete }: { onComplete?: () => void } = {}) {
   const toggleTag = (tag: string) => {
     setForm((f) => ({
       ...f,
-      tags: f.tags.includes(tag) ? f.tags.filter((t) => t !== tag) : [...f.tags, tag],
+      tags: f.tags.includes(tag)
+        ? f.tags.filter((t) => t !== tag)
+        : [...f.tags, tag],
     }));
   };
 
-  const canProceedStep1 = form.name.trim().length > 0 && form.role.trim().length > 0 && form.username.trim().length > 0;
+  const canProceedStep1 =
+    form.name.trim().length > 0 &&
+    form.role.trim().length > 0 &&
+    form.username.trim().length > 0;
 
   const handleComplete = () => {
     const clean = (s: string) => s.replace("@", "").trim();
     const links: { type: string; url: string }[] = [];
-    if (form.username) links.push({ type: "telegram", url: `https://t.me/${clean(form.username)}` });
+    if (form.username)
+      links.push({
+        type: "telegram",
+        url: `https://t.me/${clean(form.username)}`,
+      });
 
     const tg = (window as any).Telegram?.WebApp;
     const tgUser = tg?.initDataUnsafe?.user;
@@ -64,229 +93,272 @@ export function Setup({ onComplete }: { onComplete?: () => void } = {}) {
       companyUrl: form.companyUrl.trim(),
     });
 
-    if (onComplete) {
-      onComplete();
-    } else {
-      navigate("/", { replace: true });
-    }
+    if (onComplete) onComplete();
+    else navigate("/", { replace: true });
   };
 
   return (
     <div
-      className="min-h-screen flex flex-col"
-      style={{ padding: "0 16px 40px", background: "linear-gradient(180deg, #DCEEFB 0%, #EEF6FF 45%, #E6F0FF 100%)" }}
+      style={{
+        minHeight: "100vh",
+        background: "var(--bg)",
+        color: "var(--ivory)",
+        position: "relative",
+        padding: "0 16px 40px",
+      }}
     >
-      {/* Logo & heading */}
-      <div className="pt-16 pb-6 text-center">
+      <Atmosphere intensity={0.35} />
+
+      <div style={{ position: "relative", zIndex: 1 }}>
+        <div style={{ paddingTop: 60 }}>
+          <CoordLine left="ECHO · IDENTITY" right={`STEP ${step} / 2`} />
+        </div>
+
+        {/* Logo */}
         <div
-          className="w-20 h-20 rounded-[24px] flex items-center justify-center mx-auto mb-4"
           style={{
-            background: "linear-gradient(135deg, #5AC8FA 0%, #007AFF 100%)",
-            boxShadow: "0 8px 32px rgba(0,122,255,0.35)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            paddingTop: 30,
+            paddingBottom: 18,
+            textAlign: "center",
           }}
         >
-          <span style={{ fontSize: "38px", fontWeight: 800, color: "white", letterSpacing: "-2px" }}>W</span>
-        </div>
-        <h1 style={{ fontSize: "28px", fontWeight: 700, color: "#0a1628", letterSpacing: "-0.5px" }}>
-          Настройте профиль
-        </h1>
-        <p style={{ fontSize: "15px", color: "#8E8E93", marginTop: "6px" }}>
-          {step === 1 ? "Основная информация" : "Ссылки и интересы"}
-        </p>
-        {/* Step indicator */}
-        <div className="flex gap-2 justify-center mt-4">
-          {[1, 2].map((s) => (
+          <div style={{ position: "relative", width: 120, height: 90, marginBottom: 14 }}>
             <div
-              key={s}
-              className="h-1.5 rounded-full transition-all duration-300"
               style={{
-                width: step === s ? "28px" : "6px",
-                background: step === s ? "#007AFF" : "rgba(0,0,0,0.12)",
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
-            />
-          ))}
-        </div>
-      </div>
-
-      <AnimatePresence mode="wait">
-        {step === 1 ? (
-          <motion.div
-            key="step1"
-            initial={{ opacity: 0, x: 24 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -24 }}
-            transition={{ duration: 0.25 }}
-            className="flex-1 space-y-3"
-          >
-            <Field label="Имя и фамилия *">
-              <input
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="Алексей Смирнов"
-                className="w-full px-4 py-3 text-base"
-              />
-            </Field>
-            <Field label="Должность *">
-              <input
-                value={form.role}
-                onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
-                placeholder="Media Buyer"
-                className="w-full px-4 py-3 text-base"
-              />
-            </Field>
-            <Field label="Компания">
-              <input
-                value={form.company}
-                onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
-                placeholder="Digital Agency"
-                className="w-full px-4 py-3 text-base"
-              />
-            </Field>
-            <Field label="Telegram *">
-              <div className="relative">
-                <span
-                  style={{
-                    position: "absolute", left: "14px", top: "50%",
-                    transform: "translateY(-50%)", color: "#8E8E93", fontSize: "15px",
-                  }}
-                >
-                  @
-                </span>
-                <input
-                  value={form.username.replace("@", "")}
-                  onChange={(e) => setForm((f) => ({ ...f, username: e.target.value.replace("@", "") }))}
-                  placeholder="username"
-                  className="w-full py-3 text-base"
-                  style={{ paddingLeft: "28px", paddingRight: "16px" }}
-                />
-              </div>
-            </Field>
-          </motion.div>
-        ) : (
-          <motion.div
-            key="step2"
-            initial={{ opacity: 0, x: 24 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -24 }}
-            transition={{ duration: 0.25 }}
-            className="flex-1 space-y-3"
-          >
-            <Field label="Сайт компании">
-              <input
-                value={form.companyUrl}
-                onChange={(e) => setForm((f) => ({ ...f, companyUrl: e.target.value }))}
-                placeholder="https://company.com"
-                className="w-full px-4 py-3 text-base"
-              />
-            </Field>
-            <Field label="О себе">
-              <textarea
-                value={form.bio}
-                onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))}
-                placeholder="Расскажите о себе и своей специализации"
-                rows={3}
-                className="w-full px-4 py-3 text-base resize-none"
-              />
-            </Field>
-            <div>
-              <label
-                style={{
-                  fontSize: "13px", fontWeight: 600, color: "#8E8E93",
-                  display: "block", marginBottom: "8px",
-                  textTransform: "uppercase", letterSpacing: "0.5px",
-                }}
-              >
-                Ниши
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {PRESET_TAGS.map((tag) => (
-                  <button
-                    key={tag}
-                    onClick={() => toggleTag(tag)}
-                    className="px-3 py-1.5 rounded-full text-sm font-medium transition-all active:scale-95"
-                    style={
-                      form.tags.includes(tag)
-                        ? { background: "#007AFF", color: "white", boxShadow: "0 2px 8px rgba(0,122,255,0.3)" }
-                        : { background: "rgba(0,0,0,0.06)", color: "#3c3c43" }
-                    }
-                  >
-                    {tag}
-                  </button>
-                ))}
-              </div>
+            >
+              <Sonar size={110} rings={4} opacity={0.4} />
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            <div
+              style={{
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                transform: "translate(-50%,-50%)",
+              }}
+            >
+              <W52Mark size={56} color="var(--ivory)" />
+            </div>
+          </div>
+          <Hero size={30}>Ваша визитка</Hero>
+          <p
+            className="font-serif it text-muted-w"
+            style={{ fontSize: 15, marginTop: 8, lineHeight: 1.5, maxWidth: 280 }}
+          >
+            {step === 1
+              ? "Это видит тот, кто сканирует ваш QR."
+              : "Что вы делаете — пара деталей."}
+          </p>
 
-      {/* Action buttons */}
-      <div className="mt-8 space-y-2.5">
-        {step === 1 ? (
-          <PrimaryButton onClick={() => setStep(2)} disabled={!canProceedStep1}>
-            Далее →
-          </PrimaryButton>
-        ) : (
-          <>
-            <PrimaryButton onClick={handleComplete}>
-              Начать работу
-            </PrimaryButton>
-            <SecondaryButton onClick={() => setStep(1)}>
-              ← Назад
-            </SecondaryButton>
-          </>
-        )}
+          {/* Step indicator dots */}
+          <div style={{ display: "flex", gap: 8, justifyContent: "center", marginTop: 18 }}>
+            {[1, 2].map((s) => (
+              <div
+                key={s}
+                style={{
+                  height: 4,
+                  borderRadius: 2,
+                  width: step === s ? 28 : 6,
+                  background: step === s ? "var(--signal)" : "var(--line-soft)",
+                  transition: "width 0.3s",
+                }}
+              />
+            ))}
+          </div>
+        </div>
+
+        <AnimatePresence mode="wait">
+          {step === 1 ? (
+            <motion.div
+              key="step1"
+              initial={{ opacity: 0, x: 24 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -24 }}
+              transition={{ duration: 0.25 }}
+              style={{ paddingTop: 14, display: "flex", flexDirection: "column", gap: 14 }}
+            >
+              <Field label="ИМЯ">
+                <input
+                  value={form.name}
+                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  placeholder="Алексей Смирнов"
+                  style={inputStyle}
+                />
+              </Field>
+              <Field label="ДОЛЖНОСТЬ">
+                <input
+                  value={form.role}
+                  onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
+                  placeholder="Media Buyer"
+                  style={inputStyle}
+                />
+              </Field>
+              <Field label="КОМПАНИЯ">
+                <input
+                  value={form.company}
+                  onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))}
+                  placeholder="Digital Agency"
+                  style={inputStyle}
+                />
+              </Field>
+              <Field label="TELEGRAM">
+                <div style={{ position: "relative" }}>
+                  <span
+                    style={{
+                      position: "absolute",
+                      left: 16,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      color: "var(--faint)",
+                      fontFamily: "var(--serif)",
+                      fontSize: 15,
+                    }}
+                  >
+                    @
+                  </span>
+                  <input
+                    value={form.username.replace("@", "")}
+                    onChange={(e) =>
+                      setForm((f) => ({
+                        ...f,
+                        username: e.target.value.replace("@", ""),
+                      }))
+                    }
+                    placeholder="username"
+                    style={{ ...inputStyle, paddingLeft: 30 }}
+                  />
+                </div>
+              </Field>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="step2"
+              initial={{ opacity: 0, x: 24 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -24 }}
+              transition={{ duration: 0.25 }}
+              style={{ paddingTop: 14, display: "flex", flexDirection: "column", gap: 14 }}
+            >
+              <Field label="САЙТ КОМПАНИИ">
+                <input
+                  value={form.companyUrl}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, companyUrl: e.target.value }))
+                  }
+                  placeholder="https://company.com"
+                  style={inputStyle}
+                />
+              </Field>
+              <Field label="О СЕБЕ">
+                <textarea
+                  value={form.bio}
+                  onChange={(e) => setForm((f) => ({ ...f, bio: e.target.value }))}
+                  placeholder="Расскажите о специализации"
+                  rows={3}
+                  style={{ ...inputStyle, resize: "none", padding: "14px 16px" }}
+                />
+              </Field>
+              <div>
+                <label className="eyebrow" style={{ marginBottom: 10, display: "block", paddingLeft: 4 }}>
+                  НИШИ
+                </label>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {PRESET_TAGS.map((tag) => {
+                    const active = form.tags.includes(tag);
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => toggleTag(tag)}
+                        style={{
+                          padding: "7px 13px",
+                          borderRadius: 100,
+                          background: active ? "var(--ivory)" : "transparent",
+                          color: active ? "var(--abyss)" : "var(--muted-fg)",
+                          fontFamily: "var(--mono)",
+                          fontSize: 11,
+                          letterSpacing: "0.04em",
+                          textTransform: "uppercase",
+                          border:
+                            "1px solid " +
+                            (active ? "var(--ivory)" : "var(--line-soft)"),
+                          cursor: "pointer",
+                        }}
+                      >
+                        {tag}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div style={{ marginTop: 32, display: "flex", flexDirection: "column", gap: 10 }}>
+          {step === 1 ? (
+            <IvoryBtn onClick={() => setStep(2)} disabled={!canProceedStep1}>
+              Далее
+              <svg width="14" height="14" viewBox="0 0 14 14">
+                <path
+                  d="M1 7h12M8 2l5 5-5 5"
+                  stroke="var(--abyss)"
+                  strokeWidth="1.7"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </IvoryBtn>
+          ) : (
+            <>
+              <IvoryBtn onClick={handleComplete}>Начать работу</IvoryBtn>
+              <GhostBtn onClick={() => setStep(1)}>← Назад</GhostBtn>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+const inputStyle: React.CSSProperties = {
+  width: "100%",
+  padding: "14px 16px",
+  background: "var(--surface)",
+  border: "1px solid var(--line-soft)",
+  borderRadius: 14,
+  color: "var(--ivory)",
+  fontFamily: "var(--serif)",
+  fontSize: 16,
+  letterSpacing: "-0.005em",
+  outline: "none",
+};
+
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
   return (
     <div>
       <label
-        style={{
-          fontSize: "13px", fontWeight: 600, color: "#8E8E93",
-          display: "block", marginBottom: "6px",
-          textTransform: "uppercase", letterSpacing: "0.5px",
-        }}
+        className="eyebrow"
+        style={{ display: "block", marginBottom: 8, paddingLeft: 4 }}
       >
         {label}
       </label>
       {children}
     </div>
-  );
-}
-
-function PrimaryButton({ onClick, disabled, children }: { onClick: () => void; disabled?: boolean; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className="w-full rounded-[14px] text-white font-semibold transition-all active:scale-97 disabled:opacity-40"
-      style={{
-        background: "linear-gradient(180deg, #3AA3FF 0%, #007AFF 50%, #0063D1 100%)",
-        height: "50px", fontSize: "17px",
-        boxShadow: "0 4px 20px rgba(0,122,255,0.45), inset 0 1px 0 rgba(255,255,255,0.28)",
-      }}
-    >
-      {children}
-    </button>
-  );
-}
-
-function SecondaryButton({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button
-      onClick={onClick}
-      className="w-full rounded-[14px] font-semibold transition-all active:scale-97"
-      style={{
-        background: "rgba(255,255,255,0.72)",
-        backdropFilter: "blur(20px)",
-        border: "0.5px solid rgba(0,0,0,0.1)",
-        color: "#007AFF", height: "50px", fontSize: "17px",
-      }}
-    >
-      {children}
-    </button>
   );
 }
