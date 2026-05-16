@@ -110,7 +110,7 @@ async function transcribeVoice(fileId: string): Promise<string | null> {
 
 /** Open-App inline keyboard — used everywhere as the single CTA */
 function openAppKeyboard() {
-  return [[{ text: "📡 Открыть Echo", web_app: { url: APP_URL } }]];
+  return [[{ text: "⚡ Открыть приложение", web_app: { url: APP_URL } }]];
 }
 
 /** Main keyboard — minimal: just one button to open the app */
@@ -119,14 +119,16 @@ function mainMenuKeyboard() {
 }
 
 const HELP_TEXT =
-  "<b>Echo · команды</b>\n" +
-  "<i>Every signal finds its receiver.</i>\n\n" +
-  "📇 /share — поделиться своей визиткой\n" +
-  "➕ /add @username заметка — быстро записать контакт\n" +
-  "🎙️ Голосовое — пришли голосовое, расшифрую и прикреплю к контакту\n" +
-  "ℹ️ /help — эта справка\n\n" +
-  "<b>Совет:</b> Плохая связь на конференции? Пиши боту " +
-  "<code>/add @user о чём говорили</code> — синхронизируется когда откроешь приложение.";
+  "<b>Что я умею</b>\n\n" +
+  "📇 Сохраняю людей с конференций — по QR, по @username, по голосу.\n" +
+  "🎙️ Расшифровываю голосовые — пришли запись, текст прикреплю к контакту.\n" +
+  "✨ Делаю AI-сводку: о чём говорили, какие темы, когда написать.\n" +
+  "🔔 Напоминаю окликнуть тех, кто завис — чтобы знакомство не угасло.\n\n" +
+  "<b>Команды</b>\n" +
+  "/share — отправить свою визитку\n" +
+  "/add @username заметка — записать контакт прямо в чате\n" +
+  "/help — эта справка\n\n" +
+  "<i>Плохая связь на стенде? Просто пиши боту — синхронизируется потом.</i>";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== "POST") return res.status(200).send("Echo Bot is running");
@@ -198,20 +200,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await sendMessage(chatId, HELP_TEXT, { reply_markup: { inline_keyboard: mainMenuKeyboard() } });
       } else if (data === "about") {
         await sendMessage(chatId,
-          `<b>Echo.</b>\n` +
+          `<b>Echo</b> — твоя память о людях с конференций.\n` +
           `<i>Every signal finds its receiver.</i>\n\n` +
-          `Нетворкинг-память для конференций. Один сигнал — и контакт уже у тебя.\n\n` +
-          `<b>Что внутри:</b>\n` +
-          `• Обмен визитками через QR\n` +
-          `• AI-резюме каждого контакта\n` +
-          `• Follow-up напоминания\n` +
-          `• Голосовые заметки с расшифровкой\n` +
-          `• Работает офлайн через бота\n\n` +
+          `После трёх дней нетворкинга в голове каша: кто что обещал, кому надо написать, с кем созвон. Echo всё это держит за тебя.\n\n` +
+          `<b>Как работает:</b>\n` +
+          `• Знакомишься — сканируешь QR или пересылаешь @username\n` +
+          `• Записываешь голосом, пока свежо — я расшифрую и сделаю сводку\n` +
+          `• Через пару дней я напомню написать тем, кто ждёт ответа\n` +
+          `• Утром на стенде покажу, кому из вчерашних окликнуть\n\n` +
+          `Данные хранятся на твоём устройстве. Бесплатно.\n\n` +
           `<code>WHALE · 52 HZ</code>`,
-          { reply_markup: { inline_keyboard: openAppKeyboard() } }
+          {
+            reply_markup: {
+              inline_keyboard: [
+                ...openAppKeyboard(),
+                [
+                  { text: "📄 Политика", url: `${APP_URL}/privacy.html` },
+                  { text: "📑 Условия", url: `${APP_URL}/terms.html` },
+                ],
+              ],
+            },
+          }
         );
       } else if (data === "menu") {
-        await sendMessage(chatId, "Echo.", { reply_markup: { inline_keyboard: mainMenuKeyboard() } });
+        await sendMessage(chatId, "Открыть Echo:", { reply_markup: { inline_keyboard: mainMenuKeyboard() } });
       }
       return res.status(200).json({ ok: true });
     }
@@ -219,15 +231,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ─── /start ───────────────────────────────────────────
     if (text === "/start" || text.startsWith("/start ")) {
       await sendMessage(chatId,
-        `👋 Привет, <b>${firstName}</b>.\n\n` +
-        `<b>Echo.</b> <i>Every signal finds its receiver.</i>\n\n` +
-        `Нетворкинг-память для конференций: обмен QR-визитками, AI-сводки и follow-up напоминания.\n\n` +
-        `Открой приложение или пришли голосовое — я расшифрую.`,
+        `Привет, <b>${firstName}</b>. Я <b>Echo</b>.\n\n` +
+        `Помогаю не терять людей с конференций: сохраняю контакты, помню о чём говорили, напоминаю написать.\n\n` +
+        `<i>Every signal finds its receiver.</i>\n\n` +
+        `С чего начнём?`,
         {
           reply_markup: {
             inline_keyboard: [
               ...mainMenuKeyboard(),
-              [{ text: "ℹ️ Помощь", callback_data: "help" }, { text: "📖 О Echo", callback_data: "about" }],
+              [
+                { text: "Настроить визитку", web_app: { url: `${APP_URL}/edit-profile` } },
+                { text: "Как это работает?", callback_data: "about" },
+              ],
             ],
           },
         }
@@ -243,22 +258,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     else if (text === "/share") {
       if (!senderUsername) {
         await sendMessage(chatId,
-          `❌ В Telegram не задан username.\n\n` +
-          `Чтобы делиться визиткой через бота, задай username в Настройках Telegram → Изменить профиль → Имя пользователя.\n\n` +
-          `А пока можешь поделиться визиткой прямо из приложения:`,
-          { reply_markup: { inline_keyboard: [[{ text: "📇 Открыть профиль", web_app: { url: `${APP_URL}/share-profile` } }]] } }
+          `Чтобы делиться визиткой через меня, задай username в Telegram: Настройки → Изменить профиль → Имя пользователя.\n\n` +
+          `Пока — можно поделиться визиткой прямо из приложения:`,
+          { reply_markup: { inline_keyboard: [[{ text: "📇 Моя визитка", web_app: { url: `${APP_URL}/share-profile` } }]] } }
         );
       } else {
         const profileUrl = `${APP_URL}/u/${senderUsername}`;
         await sendMessage(chatId,
-          `📇 <b>Твоя визитка Echo</b>\n\n` +
+          `📇 <b>Твоя визитка</b>\n\n` +
           `<code>${escapeHtml(profileUrl)}</code>\n\n` +
-          `Перешли это сообщение или нажми кнопку — собеседник откроет визитку и добавит в контакты в один клик.`,
+          `Перешли это сообщение собеседнику — он откроет визитку и сохранит тебя в контакты в один тап.`,
           {
             reply_markup: {
               inline_keyboard: [
-                [{ text: "📤 Поделиться визиткой", switch_inline_query: "" }],
-                [{ text: "📡 Открыть Echo", web_app: { url: APP_URL } }],
+                [{ text: "📤 Отправить в чат", switch_inline_query: "" }],
+                [{ text: "📇 Открыть мою визитку", web_app: { url: `${APP_URL}/my-card` } }],
               ],
             },
           }
@@ -271,12 +285,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const args = text.replace(/^\/add(@\w+)?\s*/i, "").trim();
       if (!args) {
         await sendMessage(chatId,
-          `📝 <b>Быстро добавить контакт</b>\n\n` +
-          `Используй: <code>/add @username о чём говорили</code>\n\n` +
-          `<b>Примеры:</b>\n` +
-          `<code>/add @vasilisa Платёжки, MAC 2026</code>\n` +
-          `<code>/add @nikita Арбитраж, Bangkok</code>\n\n` +
-          `<i>Удобно когда связь плохая — пиши боту, потом синхронизируешь в приложении.</i>`
+          `📝 <b>Записать контакт</b>\n\n` +
+          `Формат: <code>/add @username о чём говорили</code>\n\n` +
+          `Примеры:\n` +
+          `<code>/add @vasilisa платёжки, MAC 2026</code>\n` +
+          `<code>/add @nikita арбитраж, Bangkok</code>\n\n` +
+          `<i>Связь на стенде слабая — пиши сюда, всё подтянется в приложение позже.</i>`
         );
       } else {
         const m = args.match(/^(@?\w+)\s*([\s\S]*)?$/);
@@ -317,7 +331,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const voice = update.message.voice;
 
       // 1. Quick ack so user knows we're working on it
-      const ackId = await sendMessage(chatId, `🎙️ <b>Расшифровываю…</b>\n<i>Первая расшифровка может занять до минуты (модель прогревается).</i>`);
+      const ackId = await sendMessage(chatId, `🎙️ <b>Слушаю…</b>\n<i>Первая расшифровка занимает до минуты — модель просыпается.</i>`);
 
       // 2. Run Whisper
       const text = await transcribeVoice(voice.file_id);
@@ -325,7 +339,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!text) {
         if (ackId) {
           await editMessage(chatId, ackId,
-            `❌ <b>Не удалось расшифровать</b>\n\nПопробуй ещё раз через минуту — модель могла не прогреться.`
+            `Не удалось разобрать запись. Попробуй ещё раз через минуту.`
           );
         }
       } else {
@@ -340,7 +354,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const display = safe.length > 3500 ? safe.slice(0, 3500) + "…" : safe;
         if (ackId) {
           await editMessage(chatId, ackId,
-            `🎙️ <b>Расшифровано</b>\n\n<blockquote>${display}</blockquote>`,
+            `🎙️ <b>Готово</b>\n\n<blockquote>${display}</blockquote>`,
             {
               reply_markup: {
                 inline_keyboard: [
@@ -351,7 +365,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           );
         } else {
           await sendMessage(chatId,
-            `🎙️ <b>Расшифровано</b>\n\n<blockquote>${display}</blockquote>`,
+            `🎙️ <b>Готово</b>\n\n<blockquote>${display}</blockquote>`,
             {
               reply_markup: {
                 inline_keyboard: [
@@ -367,8 +381,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ─── Photo ────────────────────────────────────────────
     else if (update.message?.photo) {
       await sendMessage(chatId,
-        `📷 <b>Получил фото</b>\n\n` +
-        `QR-коды быстрее распознаются прямо в приложении — открой Echo и наведи камеру:`,
+        `📷 Получил фото.\n\nЕсли это QR-визитка — открой приложение и наведи камеру, так быстрее:`,
         { reply_markup: { inline_keyboard: openAppKeyboard() } }
       );
     }
@@ -383,18 +396,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       params.set("event", "Из Telegram");
       const url = `${APP_URL}/add-contact?${params.toString()}`;
       await sendMessage(chatId,
-        `📇 <b>Получил контакт</b>\n\n` +
-        (name ? `${name}\n` : "") +
-        (c.phone_number ? `📞 ${escapeHtml(c.phone_number)}\n` : "") +
-        `\nДобавить в Echo?`,
-        { reply_markup: { inline_keyboard: [[{ text: "💾 Сохранить в Echo", web_app: { url } }]] } }
+        `📇 Получил контакт.\n` +
+        (name ? `\n${name}` : "") +
+        (c.phone_number ? `\n📞 ${escapeHtml(c.phone_number)}` : "") +
+        `\n\nСохранить?`,
+        { reply_markup: { inline_keyboard: [[{ text: "💾 Сохранить", web_app: { url } }]] } }
       );
     }
 
     // ─── Unknown command ──────────────────────────────────
     else if (text.startsWith("/")) {
       await sendMessage(chatId,
-        `🤔 Не знаю такой команды.\n\nПосмотри /help — там полный список.`,
+        `Не знаю такой команды. Посмотри /help — там всё, что я умею.`,
         { reply_markup: { inline_keyboard: [[{ text: "ℹ️ Помощь", callback_data: "help" }]] } }
       );
     }
@@ -408,10 +421,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       const url = `${APP_URL}/voice-note?id=${encodeURIComponent(draftId)}`;
       await sendMessage(chatId,
-        `📝 <b>Заметка сохранена</b>\n\n<blockquote>${escapeHtml(text.slice(0, 500))}</blockquote>\n\n` +
+        `📝 <b>Записал заметку</b>\n\n<blockquote>${escapeHtml(text.slice(0, 500))}</blockquote>\n\n` +
         (redisConfigured
-          ? `Прикрепи её к нужному контакту:`
-          : `<i>Redis не подключён — заметка не сохранится между сессиями. Добавь REDIS_URL.</i>`),
+          ? `Привяжи её к человеку — пока свежо:`
+          : `<i>Хранилище не настроено — заметка не доживёт до следующей сессии.</i>`),
         {
           reply_markup: {
             inline_keyboard: redisConfigured

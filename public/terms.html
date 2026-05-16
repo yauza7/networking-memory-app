@@ -4,49 +4,80 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Условия использования — Echo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
 <style>
-  body { font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 720px; margin: 0 auto; padding: 24px; color: #0a1628; background: #EEF6FF; }
-  h1 { font-size: 26px; }
-  h2 { font-size: 18px; margin-top: 24px; }
-  a { color: #007AFF; }
-  hr { border: none; border-top: 1px solid rgba(0,0,0,.08); margin: 24px 0; }
-  .muted { color: #8E8E93; font-size: 13px; }
+  :root {
+    --abyss:  oklch(0.130 0.025 240);
+    --bg:     oklch(0.155 0.025 240);
+    --surface: oklch(0.230 0.034 240);
+    --line:   oklch(0.295 0.035 240);
+    --ivory:  oklch(0.965 0.012 80);
+    --muted:  oklch(0.72 0.025 240);
+    --faint:  oklch(0.52 0.030 240);
+    --signal: oklch(0.86 0.130 195);
+  }
+  html, body { margin: 0; background: var(--bg); color: var(--ivory); }
+  body { font: 15px/1.65 'Instrument Sans', -apple-system, system-ui, sans-serif; max-width: 680px; margin: 0 auto; padding: 36px 22px 64px; }
+  .wordmark { font-family: 'Instrument Serif', serif; font-size: 32px; letter-spacing: -0.02em; }
+  .wordmark .dot { color: var(--signal); }
+  .eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint); }
+  h1 { font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 30px; letter-spacing: -0.02em; margin: 18px 0 6px; }
+  h2 { font-family: 'Instrument Sans', sans-serif; font-size: 16px; font-weight: 600; margin: 28px 0 8px; }
+  ul { padding-left: 22px; }
+  li { margin: 4px 0; }
+  a { color: var(--signal); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  hr { border: none; border-top: 1px solid var(--line); margin: 28px 0; }
+  .muted { color: var(--muted); font-size: 13px; }
 </style>
 </head>
 <body>
-<h1>Условия использования Echo</h1>
-<p class="muted">Дата вступления в силу: 15 мая 2026</p>
 
-<h2>1. Принятие условий</h2>
-<p>Используя Echo, вы соглашаетесь с настоящими Условиями. Если не согласны — не используйте приложение.</p>
+<div class="eyebrow">WHALE · 52 HZ · TERMS</div>
+<div class="wordmark">Echo<span class="dot">.</span></div>
 
-<h2>2. Описание сервиса</h2>
-<p>Echo — бесплатный Telegram Mini App для управления контактами с конференций и мероприятий.</p>
+<h1>Условия использования</h1>
+<p class="muted">Действует с 17 мая 2026 года</p>
 
-<h2>3. Аккаунт и данные</h2>
+<p>Echo — бесплатный сервис: Telegram-бот и Mini App для управления контактами и заметками с конференций. Используя Echo, ты соглашаешься с тем, что ниже.</p>
+
+<h2>1. Что это</h2>
+<p>Сервис для личного нетворкинга. Не CRM, не корпоративное хранилище. Подходит для индивидуального использования.</p>
+
+<h2>2. Аккаунт</h2>
 <ul>
-<li>Для использования нужен аккаунт Telegram</li>
-<li>Все данные хранятся локально на вашем устройстве</li>
-<li>Вы отвечаете за безопасность своих данных и устройства</li>
-<li>Мы не восстанавливаем удалённые данные</li>
+  <li>Для работы нужен аккаунт Telegram — мы используем его как способ входа</li>
+  <li>Ты отвечаешь за свою визитку и за то, что в ней написано</li>
+  <li>За безопасность устройства и данных тоже отвечаешь ты</li>
 </ul>
 
-<h2>4. Допустимое использование</h2>
-<p>Запрещено: спам, загрузка чужих данных без согласия, взлом, незаконное использование.</p>
+<h2>3. Что нельзя</h2>
+<ul>
+  <li>Сохранять чужие данные без согласия людей</li>
+  <li>Рассылать спам через шаблоны follow-up</li>
+  <li>Использовать сервис для незаконной деятельности</li>
+  <li>Пытаться обойти ограничения, ломать API, выгружать чужие данные</li>
+</ul>
 
-<h2>5. Отказ от гарантий</h2>
-<p>Приложение предоставляется «как есть». Не гарантируется бесперебойная работа, сохранность данных и точность AI-резюме.</p>
+<h2>4. Гарантии</h2>
+<p>Echo предоставляется «как есть». Мы не гарантируем бесперебойную работу, сохранность данных и точность AI-сводок. Сделай экспорт в CSV, если данные важны.</p>
 
-<h2>6. Ограничение ответственности</h2>
-<p>Мы не несём ответственности за потерю данных, действия третьих лиц, ущерб от использования AI.</p>
+<h2>5. Ответственность</h2>
+<p>Мы не отвечаем за потерю данных, действия других пользователей, ошибки AI и последствия использования рекомендованных шаблонов. Решение «писать или не писать» — за тобой.</p>
 
-<h2>7. Изменения</h2>
-<p>Мы можем изменять, приостанавливать или прекращать работу приложения. Постараемся предупреждать заранее.</p>
+<h2>6. Изменения</h2>
+<p>Мы можем менять, ставить на паузу или закрывать сервис. Если изменения существенные — предупредим заранее в боте.</p>
+
+<h2>7. Прекращение</h2>
+<p>Ты можешь прекратить использовать Echo в любой момент: удалить Mini App, очистить данные приложения, заблокировать бота. Мы можем ограничить доступ при нарушении этих условий.</p>
 
 <h2>8. Контакт</h2>
-<p>Вопросы — пишите автору бота в Telegram.</p>
+<p>Вопросы — пиши автору бота в Telegram.</p>
 
 <hr/>
-<p class="muted"><a href="/">← вернуться в приложение</a></p>
+<p class="muted"><a href="/">← вернуться в Echo</a></p>
+
 </body>
 </html>

@@ -4,45 +4,78 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Политика конфиденциальности — Echo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
 <style>
-  body { font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; max-width: 720px; margin: 0 auto; padding: 24px; color: #0a1628; background: #EEF6FF; }
-  h1 { font-size: 26px; }
-  h2 { font-size: 18px; margin-top: 24px; }
-  a { color: #007AFF; }
-  hr { border: none; border-top: 1px solid rgba(0,0,0,.08); margin: 24px 0; }
-  .muted { color: #8E8E93; font-size: 13px; }
+  :root {
+    --abyss:  oklch(0.130 0.025 240);
+    --bg:     oklch(0.155 0.025 240);
+    --surface: oklch(0.230 0.034 240);
+    --line:   oklch(0.295 0.035 240);
+    --ivory:  oklch(0.965 0.012 80);
+    --muted:  oklch(0.72 0.025 240);
+    --faint:  oklch(0.52 0.030 240);
+    --signal: oklch(0.86 0.130 195);
+  }
+  html, body { margin: 0; background: var(--bg); color: var(--ivory); }
+  body { font: 15px/1.65 'Instrument Sans', -apple-system, system-ui, sans-serif; max-width: 680px; margin: 0 auto; padding: 36px 22px 64px; }
+  .wordmark { font-family: 'Instrument Serif', serif; font-size: 32px; letter-spacing: -0.02em; }
+  .wordmark .dot { color: var(--signal); }
+  .eyebrow { font-family: 'JetBrains Mono', monospace; font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint); }
+  h1 { font-family: 'Instrument Serif', serif; font-weight: 400; font-size: 30px; letter-spacing: -0.02em; margin: 18px 0 6px; }
+  h2 { font-family: 'Instrument Sans', sans-serif; font-size: 16px; font-weight: 600; margin: 28px 0 8px; }
+  p, li { color: var(--ivory); }
+  ul { padding-left: 22px; }
+  li { margin: 4px 0; }
+  a { color: var(--signal); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  hr { border: none; border-top: 1px solid var(--line); margin: 28px 0; }
+  .muted { color: var(--muted); font-size: 13px; }
+  code { font-family: 'JetBrains Mono', monospace; font-size: 13px; background: var(--surface); padding: 1px 6px; border-radius: 4px; }
 </style>
 </head>
 <body>
-<h1>Политика конфиденциальности Echo</h1>
-<p class="muted">Дата вступления в силу: 15 мая 2026</p>
 
-<h2>Какие данные мы собираем</h2>
-<p>Echo — Telegram Mini App для нетворкинга. Мы собираем минимум данных:</p>
+<div class="eyebrow">WHALE · 52 HZ · POLICY</div>
+<div class="wordmark">Echo<span class="dot">.</span></div>
+
+<h1>Политика конфиденциальности</h1>
+<p class="muted">Действует с 17 мая 2026 года</p>
+
+<p>Echo — Telegram-бот и Mini App для нетворкинга на конференциях. Мы относимся к данным как к чужой записной книжке: смотрим только то, что нужно для работы, и не передаём дальше.</p>
+
+<h2>Какие данные собираются</h2>
 <ul>
-<li>Имя, должность, компания, био — то, что вы сами вводите в приложение</li>
-<li>Фотография профиля (по желанию)</li>
-<li>Telegram username и базовая информация от Telegram WebApp API</li>
-<li>Контакты, которые вы добавили вручную или через QR-сканер</li>
-<li>Заметки, задачи, теги</li>
+  <li>То, что ты сам вводишь в визитку: имя, должность, компания, био, ссылки</li>
+  <li>Фотография профиля — если загрузил</li>
+  <li>Telegram username, имя и ID — из Telegram WebApp API</li>
+  <li>Контакты, которые ты сохранил по QR, через @username или вручную</li>
+  <li>Заметки, теги, задачи и напоминания</li>
+  <li>Голосовые сообщения — только во время расшифровки, не хранятся</li>
 </ul>
 
-<h2>AI-обработка (опционально)</h2>
-<p>Если используете голосовые заметки / AI-резюме — текст отправляется в Anthropic (Claude API) для обработки. Anthropic не использует эти данные для обучения.</p>
+<h2>Где это лежит</h2>
+<p>Основные данные — на твоём устройстве, в <code>localStorage</code> браузера Telegram. На наших серверах хранится только минимум для работы бота: твой Telegram ID, время регистрации, очередь напоминаний и временные расшифровки голоса (до 24 часов).</p>
 
-<h2>Где хранятся данные</h2>
-<p>Все данные хранятся <b>локально на вашем устройстве</b> (localStorage). Мы не храним их на наших серверах. При очистке Telegram / браузера — данные удаляются безвозвратно. Рекомендуем экспортировать в CSV.</p>
+<h2>AI-обработка</h2>
+<p>Когда ты создаёшь AI-сводку или используешь голосовые — текст уходит в Anthropic (Claude) и HuggingFace (Whisper) только на время одного запроса. Поставщики моделей подтверждают, что данные не используются для обучения.</p>
 
-<h2>Передача третьим лицам</h2>
-<p>Мы не передаём ваши данные третьим лицам, кроме Anthropic для AI-обработки конкретного запроса.</p>
+<h2>Кому передаём</h2>
+<p>Никому, кроме провайдеров инфраструктуры (Vercel, Upstash, Anthropic, HuggingFace) — и только в объёме, необходимом для обработки конкретного запроса. Мы не продаём данные, не используем их для рекламы.</p>
 
-<h2>Ваши права</h2>
-<p>Вы можете экспортировать данные в CSV, удалить их через настройки браузера / Telegram, прекратить использование приложения в любой момент.</p>
+<h2>Что ты можешь</h2>
+<ul>
+  <li>Выгрузить все контакты в CSV — кнопка в настройках</li>
+  <li>Стереть всё — очисти данные приложения в Telegram или удали Mini App</li>
+  <li>Отписаться от напоминаний — командой в боте или в настройках</li>
+</ul>
 
 <h2>Контакт</h2>
-<p>Вопросы по приватности — напишите автору бота в Telegram.</p>
+<p>Вопросы по приватности — напиши автору бота в Telegram.</p>
 
 <hr/>
-<p class="muted"><a href="/">← вернуться в приложение</a></p>
+<p class="muted"><a href="/">← вернуться в Echo</a></p>
+
 </body>
 </html>
