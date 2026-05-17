@@ -28,10 +28,22 @@ const BOT_SHORT_DESCRIPTION =
 
 const COMMANDS = [
   { command: "start", description: "Открыть Echo" },
-  { command: "share", description: "Поделиться своей визиткой" },
   { command: "add", description: "Записать контакт: /add @user заметка" },
+  { command: "note", description: "Добавить заметку: /note @user текст" },
+  { command: "scan", description: "Сканер QR" },
+  { command: "contacts", description: "Мои контакты" },
+  { command: "tasks", description: "Задачи и напоминания" },
+  { command: "me", description: "Моя визитка" },
+  { command: "share", description: "Поделиться визиткой" },
+  { command: "export", description: "Выгрузить контакты в CSV" },
   { command: "help", description: "Что я умею" },
 ];
+
+const MENU_BUTTON = {
+  type: "web_app" as const,
+  text: "⚡ Открыть Echo",
+  web_app: { url: process.env.APP_URL || "https://w52-app.vercel.app" },
+};
 
 async function tg(method: string, body: object) {
   const r = await fetch(`${API}/${method}`, {
@@ -64,8 +76,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     short_description: BOT_SHORT_DESCRIPTION,
   });
 
-  // 4. Slash-command list (menu button in chat)
+  // 4. Slash-command list (the / menu)
   results.setMyCommands = await tg("setMyCommands", { commands: COMMANDS });
+
+  // 5. The persistent menu button (next to the message input, replaces "/")
+  //    This is the button that was still showing the old name.
+  results.setChatMenuButton = await tg("setChatMenuButton", { menu_button: MENU_BUTTON });
 
   return res.status(200).json({ ok: true, results });
 }
