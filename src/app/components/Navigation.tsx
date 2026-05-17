@@ -95,7 +95,7 @@ export function Navigation() {
     >
       <div
         style={{
-          background: "oklch(0.155 0.025 240 / 0.94)",
+          background: "var(--nav-bg)",
           backdropFilter: "blur(20px)",
           WebkitBackdropFilter: "blur(20px)",
           border: "1px solid var(--line-soft)",
@@ -104,7 +104,7 @@ export function Navigation() {
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          boxShadow: "0 12px 40px rgba(0,0,0,0.45)",
+          boxShadow: "var(--nav-shadow)",
         }}
       >
         {NAV_ITEMS.map((t) => {

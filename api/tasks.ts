@@ -3,16 +3,22 @@ import { verifyInitData, getInitData } from "./_lib/auth.js";
 import { redis, redisConfigured } from "./_lib/redis.js";
 
 /**
- * GET  /api/tasks  — list user's tasks (server-side mirror)
- * POST /api/tasks  — upsert a task
- *   body: { id, contactId, contactName, contactUsername?, text, dueDate (YYYY-MM-DD), completed? }
+ *   GET    /api/tasks            list user's tasks
+ *   POST   /api/tasks            upsert a task (id in body)
+ *   PATCH  /api/tasks?id=X       body: { completed: boolean }
+ *   DELETE /api/tasks?id=X
+ *
+ * All require Telegram initData auth.
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const initData = getInitData(req);
   const auth = verifyInitData(initData);
   if (!auth.ok || !auth.user) return res.status(401).json({ error: "Unauthorized" });
 
-  if (!redisConfigured) return res.status(200).json({ ok: true, persisted: false, tasks: [] });
+  if (!redisConfigured) {
+    if (req.method === "GET") return res.status(200).json({ ok: true, persisted: false, tasks: [] });
+    return res.status(200).json({ ok: true, persisted: false });
+  }
 
   const tgId = auth.user.id;
 
@@ -53,6 +59,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       await redis.zadd("tasks_due", dueUnix, `${tgId}:${id}`);
     }
 
+    return res.status(200).json({ ok: true });
+  }
+
+  // PATCH / DELETE require ?id=
+  const id = String(req.query.id || "").slice(0, 64);
+  if (!id) return res.status(400).json({ error: "id required" });
+  const key = `task:${tgId}:${id}`;
+  const member = `${tgId}:${id}`;
+
+  if (req.method === "PATCH") {
+    const body = typeof req.body === "string" ? JSON.parse(req.body) : (req.body || {});
+    const completed = body.completed === true ? "1" : "0";
+    await redis.hset(key, { completed });
+    if (completed === "1") await redis.zrem("tasks_due", member);
+    return res.status(200).json({ ok: true });
+  }
+
+  if (req.method === "DELETE") {
+    await redis.del(key);
+    await redis.zrem("tasks_due", member);
     return res.status(200).json({ ok: true });
   }
 

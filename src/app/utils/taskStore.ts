@@ -1,4 +1,5 @@
-import { pushTask, patchTask, deleteTask } from "./serverSync";
+import { pushTask, patchTask, deleteTask, pullTasks } from "./serverSync";
+import { enqueueTask } from "./outboxStore";
 
 export type TaskType = "manual" | "message" | "transfer" | "call" | "meet" | "send_materials";
 
@@ -49,10 +50,10 @@ export function saveTasks(tasks: Task[]) {
   localStorage.setItem(KEY, JSON.stringify(tasks));
 }
 
-export function addTask(task: Task) {
+export async function addTask(task: Task) {
   const stored = loadTasks();
   saveTasks([task, ...stored]);
-  pushTask({
+  const serverTask = {
     id: task.id,
     contactId: task.contactId,
     contactName: task.contactName,
@@ -60,19 +61,94 @@ export function addTask(task: Task) {
     text: task.text,
     dueDate: task.dueDate,
     completed: task.completed,
-  }).catch(() => {});
+  };
+  try {
+    const result = await pushTask(serverTask);
+    if (!result.ok) {
+      enqueueTask({ kind: "task_push", body: serverTask });
+    }
+  } catch {
+    enqueueTask({ kind: "task_push", body: serverTask });
+  }
 }
 
-export function updateTaskCompleted(id: string, completed: boolean) {
+export async function updateTaskCompleted(id: string, completed: boolean) {
   const all = loadTasks();
   saveTasks(all.map((t) => (t.id === id ? { ...t, completed } : t)));
-  patchTask(id, { completed }).catch(() => {});
+  try {
+    const result = await patchTask(id, { completed });
+    if (!result.ok) {
+      enqueueTask({ kind: "task_patch", taskId: id, body: { completed } });
+    }
+  } catch {
+    enqueueTask({ kind: "task_patch", taskId: id, body: { completed } });
+  }
 }
 
-export function removeTask(id: string) {
+export async function removeTask(id: string) {
   const all = loadTasks();
   saveTasks(all.filter((t) => t.id !== id));
-  deleteTask(id).catch(() => {});
+  try {
+    const result = await deleteTask(id);
+    if (!result.ok) {
+      enqueueTask({ kind: "task_delete", taskId: id });
+    }
+  } catch {
+    enqueueTask({ kind: "task_delete", taskId: id });
+  }
+}
+
+export async function syncTasksFromServer(): Promise<void> {
+  try {
+    const serverTasks = await pullTasks();
+    const localTasks = loadTasks();
+    const localIds = new Set(localTasks.map((t) => t.id));
+    const serverIds = new Set(serverTasks.map((t) => t.id));
+
+    // Add server tasks not in localStorage (preserve local completed status)
+    let updated = [...localTasks];
+    for (const st of serverTasks) {
+      if (!localIds.has(st.id)) {
+        updated.push({
+          id: st.id,
+          contactId: st.contactId,
+          contactName: st.contactName,
+          contactUsername: st.contactUsername,
+          text: st.text,
+          completed: st.completed ?? false,
+          dueDate: st.dueDate,
+          type: "manual",
+        });
+      }
+      // If the task is already in localStorage, do NOT overwrite — local is source of truth
+    }
+    saveTasks(updated);
+
+    // Push local tasks not on server
+    for (const lt of localTasks) {
+      if (!serverIds.has(lt.id)) {
+        const serverTask = {
+          id: lt.id,
+          contactId: lt.contactId,
+          contactName: lt.contactName,
+          contactUsername: lt.contactUsername,
+          text: lt.text,
+          dueDate: lt.dueDate,
+          completed: lt.completed,
+        };
+        try {
+          const result = await pushTask(serverTask);
+          if (!result.ok) {
+            enqueueTask({ kind: "task_push", body: serverTask });
+          }
+        } catch {
+          enqueueTask({ kind: "task_push", body: serverTask });
+        }
+      }
+    }
+  } catch {
+    // Best-effort — do not throw
+  }
 }
 
 export function createSystemTasks(
@@ -108,6 +184,6 @@ export function createSystemTasks(
     },
   ];
 
-  tasks.forEach((t) => addTask(t));
+  tasks.forEach((t) => { addTask(t).catch(() => {}); });
   return tasks;
 }

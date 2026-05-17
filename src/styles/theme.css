@@ -23,6 +23,18 @@ html[data-theme="light"] {
   --danger:     oklch(0.58 0.220 25);
 
   --ring: oklch(0.55 0.135 220 / 0.45);
+
+  /* Component-specific overrides for light mode */
+  --card-ai-bg:           oklch(0.92 0.025 200 / 0.70);
+  --card-ai-border:       oklch(0.72 0.08 195 / 0.40);
+  --textarea-tinted-bg:   var(--deep);
+  --textarea-tinted-border: oklch(0.80 0.05 220 / 0.40);
+  --avatar-initials-bg-l:   0.82;
+  --avatar-initials-text-l: 0.22;
+  --scanner-dark-bg:        var(--deep);
+  --nav-bg:                 oklch(0.97 0.010 220 / 0.94);
+  --nav-shadow:             0 4px 24px rgba(0,0,0,0.10);
+  --card-hint-bg:           linear-gradient(180deg, oklch(0.88 0.030 200), oklch(0.84 0.025 215));
 }
 html[data-theme="light"] body,
 html[data-theme="light"] {
@@ -60,6 +72,18 @@ html[data-theme="light"] .atmosphere-light {
   --serif: 'Instrument Serif', 'Iowan Old Style', 'Cambria', serif;
   --sans:  'Instrument Sans', -apple-system, system-ui, sans-serif;
   --mono:  'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+
+  /* Component-specific themed values (dark defaults) */
+  --card-ai-bg:             oklch(0.20 0.04 200 / 0.50);
+  --card-ai-border:         oklch(0.50 0.10 195 / 0.30);
+  --textarea-tinted-bg:     oklch(0.22 0.02 220 / 0.5);
+  --textarea-tinted-border: oklch(0.86 0.13 80 / 0.25);
+  --avatar-initials-bg-l:   0.28;
+  --avatar-initials-text-l: 0.92;
+  --scanner-dark-bg:        oklch(0.16 0.025 230);
+  --nav-bg:                 oklch(0.155 0.025 240 / 0.94);
+  --nav-shadow:             0 12px 40px rgba(0,0,0,0.45);
+  --card-hint-bg:           linear-gradient(180deg, oklch(0.24 0.05 210), oklch(0.19 0.04 230));
 
   /* ─── shadcn / tailwind semantic vars (mapped to moody) ── */
   --background: transparent;

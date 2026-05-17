@@ -13,6 +13,7 @@ import {
   Send,
   X,
 } from "lucide-react";
+
 import { mockContacts } from "../utils/mockData";
 import { allContacts } from "../utils/contactStore";
 import {
@@ -193,32 +194,6 @@ function TaskCard({
                 {TASK_BADGE[task.type].icon}
                 {TASK_BADGE[task.type].label}
               </span>
-            )}
-            {!task.completed && task.contactUsername && (
-              <button
-                onClick={() =>
-                  window.open(`https://t.me/${task.contactUsername}`)
-                }
-                style={{
-                  height: 26,
-                  padding: "0 11px",
-                  borderRadius: 100,
-                  background: "transparent",
-                  color: "var(--ivory)",
-                  border: "1px solid var(--line-soft)",
-                  fontFamily: "var(--mono)",
-                  fontSize: 10,
-                  letterSpacing: "0.12em",
-                  textTransform: "uppercase",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 5,
-                  cursor: "pointer",
-                }}
-              >
-                <MessageCircle className="w-2.5 h-2.5" />
-                TG
-              </button>
             )}
           </div>
         </div>

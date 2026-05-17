@@ -2,10 +2,11 @@
  * W·52 — Новый контакт (AddContact)
  * Moody. Поддерживает: ручной ввод, QR с decoded profile, и username-only.
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { motion } from "motion/react";
 import { addStoredContact } from "../utils/contactStore";
+import { fetchPublicProfile } from "../utils/profileApi";
 import type { Connection, User } from "../utils/mockData";
 import {
   Atmosphere,
@@ -76,11 +77,15 @@ export function AddContact() {
   const username    = (searchParams.get("username") || "").replace(/^@/, "").slice(0, 32);
   const dParam      = searchParams.get("d") || "";
   const eventParam  = (searchParams.get("event") || "").slice(0, 80);
+  const fromVoice   = searchParams.get("from") === "voice";
+
+  // Pending voice note passed via sessionStorage from VoiceNote screen
+  const pendingVoiceNote = useMemo(() => {
+    if (!fromVoice) return "";
+    try { return sessionStorage.getItem("pendingVoiceNote") || ""; } catch { return ""; }
+  }, [fromVoice]);
 
   const decodedProfile = useMemo(() => dParam ? decodeProfilePayload(dParam) : null, [dParam]);
-  // We always show the manual form unless we have a full decoded W·52 profile.
-  // Telegram-only scans pre-fill the username so the user just enters the actual name.
-  const showManualForm = !decodedProfile;
 
   const PRESET_EVENTS_SET = new Set(PRESET_EVENTS);
   const [event, setEvent]             = useState(eventParam && PRESET_EVENTS_SET.has(eventParam) ? eventParam : (eventParam ? "Другое" : ""));
@@ -90,6 +95,24 @@ export function AddContact() {
   const [manualUsername, setManualUsername] = useState(username);
   const [manualCompany, setManualCompany]   = useState("");
   const [manualWebsite, setManualWebsite]   = useState("");
+
+  // Server-fetched profile: used when no `d=` param OR when decode produced no name.
+  const [serverProfile, setServerProfile] = useState<Partial<User> | null>(null);
+
+  useEffect(() => {
+    // Fetch from server if: no `d=` param, OR `d=` decoded but has no name (encoding issue)
+    const needsServerFetch = username && (!dParam || !decodedProfile?.name);
+    if (!needsServerFetch) return;
+    let cancelled = false;
+    fetchPublicProfile(username).then((p) => {
+      if (cancelled || !p) return;
+      setServerProfile(p);
+      // Pre-fill manual fields so the user sees the real name/company right away.
+      if (p.name)    setManualName(p.name);
+      if (p.company) setManualCompany(p.company);
+    });
+    return () => { cancelled = true; };
+  }, [username, dParam, decodedProfile?.name]);
 
   const [selectedTags, setSelectedTags] = useState<string[]>(
     decodedProfile?.tags ?? []
@@ -101,7 +124,12 @@ export function AddContact() {
 
   const effectiveEvent = event === "Другое" ? eventCustom : event;
 
-  const canSave = decodedProfile
+  // A profile is "resolved" either from the QR `d=` param or from a server fetch.
+  const resolvedProfile = decodedProfile ?? (serverProfile?.name ? serverProfile : null);
+  // Show manual form when there's no resolved profile with a name.
+  const showManualForm = !resolvedProfile?.name;
+
+  const canSave = resolvedProfile?.name
     ? true
     : !!manualName.trim() && !!manualUsername.trim();
 
@@ -110,7 +138,7 @@ export function AddContact() {
     const cleanManualUsername = manualUsername.replace(/^@/, "").slice(0, 32);
 
     const links: { type: string; url: string }[] = [];
-    if (decodedProfile?.links) links.push(...decodedProfile.links);
+    if (resolvedProfile?.links) links.push(...resolvedProfile.links);
     else if (cleanManualUsername) links.push({ type: "telegram", url: `https://t.me/${cleanManualUsername}` });
     else if (username) links.push({ type: "telegram", url: `https://t.me/${username}` });
     if (manualWebsite.trim()) {
@@ -120,16 +148,16 @@ export function AddContact() {
       links.push({ type: "website", url });
     }
 
-    const user: User = decodedProfile ? {
+    const user: User = resolvedProfile ? {
       id:         `u-${Date.now()}`,
-      name:       decodedProfile.name     || manualName.trim() || "Новый контакт",
-      username:   decodedProfile.username || username || undefined,
-      role:       decodedProfile.role     || "",
-      company:    decodedProfile.company  || "",
-      companyUrl: (decodedProfile as any).companyUrl || undefined,
-      photo:      decodedProfile.photo    || undefined,
-      tags:       selectedTags.length ? selectedTags : (decodedProfile.tags || []),
-      bio:        decodedProfile.bio      || undefined,
+      name:       resolvedProfile.name     || manualName.trim() || username || "Новый контакт",
+      username:   resolvedProfile.username || username || undefined,
+      role:       resolvedProfile.role     || "",
+      company:    resolvedProfile.company  || "",
+      companyUrl: (resolvedProfile as any).companyUrl || undefined,
+      photo:      resolvedProfile.photo    || undefined,
+      tags:       selectedTags.length ? selectedTags : (resolvedProfile.tags || []),
+      bio:        resolvedProfile.bio      || undefined,
       links,
     } : {
       id:         `u-${Date.now()}`,
@@ -148,10 +176,18 @@ export function AddContact() {
       metAt:        new Date().toISOString(),
       event:        effectiveEvent || undefined,
       followUpSent: false,
+      note:         pendingVoiceNote ? `🎙️ ${pendingVoiceNote}` : undefined,
     };
 
     addStoredContact(newContact);
-    navigate(`/add-note?contact=${contactId}`, { replace: true });
+    // Clean up the pending voice note
+    try { if (pendingVoiceNote) sessionStorage.removeItem("pendingVoiceNote"); } catch {}
+    // If came from voice → go straight to contact card (note already saved)
+    if (fromVoice && pendingVoiceNote) {
+      navigate(`/contact/${contactId}`, { replace: true });
+    } else {
+      navigate(`/add-note?contact=${contactId}`, { replace: true });
+    }
   };
 
   return (
@@ -180,8 +216,8 @@ export function AddContact() {
           <Hero size={32}>Новый контакт</Hero>
         </div>
 
-        {/* Decoded profile preview (from QR) */}
-        {decodedProfile && (
+        {/* Profile preview (from Echo QR `d=` param or server fetch for TG QR) */}
+        {resolvedProfile && (
           <div style={{ padding: "22px 16px 0" }}>
             <motion.div
               initial={{ opacity: 0, y: 12 }}
@@ -190,22 +226,22 @@ export function AddContact() {
             >
               <div style={{ display: "flex", gap: 14, alignItems: "center" }}>
                 <Avatar
-                  name={decodedProfile.name || username || "?"}
-                  photo={decodedProfile.photo}
-                  username={decodedProfile.username || username}
+                  name={resolvedProfile.name || username || "?"}
+                  photo={resolvedProfile.photo}
+                  username={resolvedProfile.username || username}
                   size={56}
                   ring
                 />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <Hero size={20}>{decodedProfile.name || username}</Hero>
-                  {(decodedProfile.role || decodedProfile.company) && (
+                  <Hero size={20}>{resolvedProfile.name || username}</Hero>
+                  {(resolvedProfile.role || resolvedProfile.company) && (
                     <div className="text-muted-w" style={{ fontSize: 13, marginTop: 2, fontFamily: "var(--sans)" }}>
-                      {[decodedProfile.role, decodedProfile.company].filter(Boolean).join(" · ")}
+                      {[resolvedProfile.role, resolvedProfile.company].filter(Boolean).join(" · ")}
                     </div>
                   )}
-                  {(decodedProfile.username || username) && (
+                  {(resolvedProfile.username || username) && (
                     <div className="font-mono" style={{ fontSize: 11, color: "var(--signal-dim)", marginTop: 3, letterSpacing: "0.04em" }}>
-                      @{decodedProfile.username || username}
+                      @{resolvedProfile.username || username}
                     </div>
                   )}
                 </div>

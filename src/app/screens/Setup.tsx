@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import { saveCurrentUser } from "../utils/userStore";
+import { pushOwnProfile } from "../utils/profileApi";
 import {
   Atmosphere,
   Sonar,
@@ -16,17 +17,19 @@ import {
   Hero,
 } from "../components/brand/Brand";
 
-const PRESET_TAGS = [
-  "Арбитраж",
-  "Партнёрки",
-  "Партнёрские сети",
-  "Платёжки",
-  "Аккаунты",
-  "Агентские",
-  "AI/Tech",
-  "Media Buying",
-  "Crypto",
-  "iGaming",
+const TAG_GROUPS = [
+  {
+    label: "Команда",
+    tags: ["Buying", "Платёжки", "Разработка", "Партнёрская сеть", "Прилы", "Аккаунты", "Трекеры", "HR", "PR", "Дизайн", "Конференции"],
+  },
+  {
+    label: "Трафик",
+    tags: ["FB", "UAC", "PPC", "SEO", "ASO", "TikTok Ads", "Influence", "Схемы", "Email", "SMS", "УБТ"],
+  },
+  {
+    label: "Вертикали",
+    tags: ["Нутра", "Gambling", "Betting", "Adult", "Финансы", "Crypto"],
+  },
 ];
 
 export function Setup({ onComplete }: { onComplete?: () => void } = {}) {
@@ -80,17 +83,28 @@ export function Setup({ onComplete }: { onComplete?: () => void } = {}) {
     const tg = (window as any).Telegram?.WebApp;
     const tgUser = tg?.initDataUnsafe?.user;
 
+    const username = clean(form.username);
     saveCurrentUser({
       id: tgUser ? String(tgUser.id) : `u_${Date.now()}`,
       name: form.name.trim(),
       role: form.role.trim(),
       company: form.company.trim(),
-      username: clean(form.username),
+      username,
       bio: form.bio.trim(),
       tags: form.tags,
       links,
       photo: tgUser?.photo_url || "",
       companyUrl: form.companyUrl.trim(),
+    });
+
+    void pushOwnProfile({
+      username,
+      name: form.name.trim(),
+      role: form.role.trim(),
+      company: form.company.trim(),
+      companyUrl: form.companyUrl.trim(),
+      bio: form.bio.trim(),
+      tags: form.tags,
     });
 
     if (onComplete) onComplete();
@@ -148,7 +162,7 @@ export function Setup({ onComplete }: { onComplete?: () => void } = {}) {
               <W52Mark size={56} color="var(--ivory)" />
             </div>
           </div>
-          <Hero size={30}>Ваша визитка</Hero>
+          <Hero size={30}>Ваш профиль</Hero>
           <p
             className="font-serif it text-muted-w"
             style={{ fontSize: 15, marginTop: 8, lineHeight: 1.5, maxWidth: 280 }}
@@ -218,7 +232,7 @@ export function Setup({ onComplete }: { onComplete?: () => void } = {}) {
                       top: "50%",
                       transform: "translateY(-50%)",
                       color: "var(--faint)",
-                      fontFamily: "var(--serif)",
+                      fontFamily: "var(--sans)",
                       fontSize: 15,
                     }}
                   >
@@ -268,35 +282,41 @@ export function Setup({ onComplete }: { onComplete?: () => void } = {}) {
               </Field>
               <div>
                 <label className="eyebrow" style={{ marginBottom: 10, display: "block", paddingLeft: 4 }}>
-                  НИШИ
+                  ТЕГИ
                 </label>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {PRESET_TAGS.map((tag) => {
-                    const active = form.tags.includes(tag);
-                    return (
-                      <button
-                        key={tag}
-                        type="button"
-                        onClick={() => toggleTag(tag)}
-                        style={{
-                          padding: "7px 13px",
-                          borderRadius: 100,
-                          background: active ? "var(--ivory)" : "transparent",
-                          color: active ? "var(--abyss)" : "var(--muted-fg)",
-                          fontFamily: "var(--mono)",
-                          fontSize: 11,
-                          letterSpacing: "0.04em",
-                          textTransform: "uppercase",
-                          border:
-                            "1px solid " +
-                            (active ? "var(--ivory)" : "var(--line-soft)"),
-                          cursor: "pointer",
-                        }}
-                      >
-                        {tag}
-                      </button>
-                    );
-                  })}
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  {TAG_GROUPS.map((group) => (
+                    <div key={group.label}>
+                      <div className="eyebrow" style={{ marginBottom: 6, color: "var(--signal-dim)", fontSize: 10 }}>
+                        {group.label}
+                      </div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {group.tags.map((tag) => {
+                          const active = form.tags.includes(tag);
+                          return (
+                            <button
+                              key={tag}
+                              type="button"
+                              onClick={() => toggleTag(tag)}
+                              style={{
+                                padding: "5px 10px",
+                                borderRadius: 100,
+                                background: active ? "oklch(0.86 0.13 195 / 0.18)" : "transparent",
+                                color: active ? "var(--signal)" : "var(--muted-fg)",
+                                fontFamily: "var(--mono)",
+                                fontSize: 11,
+                                letterSpacing: "0.04em",
+                                border: `1px solid ${active ? "var(--signal-dim)" : "var(--line-soft)"}`,
+                                cursor: "pointer",
+                              }}
+                            >
+                              {active ? "✓ " : ""}{tag}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </motion.div>
@@ -337,7 +357,7 @@ const inputStyle: React.CSSProperties = {
   border: "1px solid var(--line-soft)",
   borderRadius: 14,
   color: "var(--ivory)",
-  fontFamily: "var(--serif)",
+  fontFamily: "var(--sans)",
   fontSize: 16,
   letterSpacing: "-0.005em",
   outline: "none",

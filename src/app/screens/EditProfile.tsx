@@ -8,6 +8,7 @@ import { useNavigate } from "react-router";
 import { motion } from "motion/react";
 import { X } from "lucide-react";
 import { loadCurrentUser, saveCurrentUser } from "../utils/userStore";
+import { pushOwnProfile } from "../utils/profileApi";
 import {
   Atmosphere,
   Hero,
@@ -100,15 +101,25 @@ export function EditProfile() {
       .filter((l) => !["telegram", "instagram", "linkedin"].includes(l.type))
       .forEach((l) => links.push(l));
 
+    const cleanUsername = username.trim().replace(/^@/, "");
     saveCurrentUser({
       name,
-      username: username.trim(),
+      username: cleanUsername,
       role,
       company,
       companyUrl,
       bio,
       tags,
       links,
+    });
+    void pushOwnProfile({
+      username: cleanUsername,
+      name,
+      role,
+      company,
+      companyUrl,
+      bio,
+      tags,
     });
     navigate(-1);
   };

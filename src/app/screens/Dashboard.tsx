@@ -3,12 +3,13 @@
  * Чистый top, без coord-line и значка кита.
  * Hero — конкретное AI-предложение по реальному контакту (follow-up).
  */
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router";
 import { motion, AnimatePresence } from "motion/react";
 import { Bell, MessageCircle, Plus, X } from "lucide-react";
 import { mockContacts, type Connection } from "../utils/mockData";
 import { allContacts, addStoredContact } from "../utils/contactStore";
+import { useContactsVersion } from "../utils/useContactsVersion";
 import { loadCurrentUser } from "../utils/userStore";
 import { loadTasks, updateTaskCompleted } from "../utils/taskStore";
 import { unreadCount } from "../utils/notificationStore";
@@ -31,7 +32,8 @@ import {
 
 export function Dashboard() {
   const currentUser = loadCurrentUser();
-  const contacts = allContacts(mockContacts);
+  const contactsVersion = useContactsVersion();
+  const contacts = useMemo(() => allContacts(mockContacts), [contactsVersion]);
   const [tasksVersion, setTasksVersion] = useState(0);
 
   const completedFollowUpIds = new Set<string>(
@@ -223,8 +225,7 @@ export function Dashboard() {
               style={{
                 ...cardStyle,
                 padding: "18px 18px 18px",
-                background:
-                  "linear-gradient(180deg, oklch(0.24 0.05 210), oklch(0.19 0.04 230))",
+                background: "var(--card-hint-bg)",
                 position: "relative",
                 overflow: "hidden",
               }}

@@ -60,13 +60,17 @@ export function MyCard() {
   };
 
   const handleShare = () => {
+    const tg = (window as any).Telegram?.WebApp;
+    // Inside Telegram: use inline query — bot sends web_app button, opens inside Mini App
+    if (tg?.switchInlineQuery) {
+      try {
+        tg.switchInlineQuery("", ["users", "groups", "channels"]);
+        return;
+      } catch {}
+    }
+    // Outside Telegram fallback
     if (navigator.share) {
-      navigator
-        .share({
-          title: `${currentUser.name} — ${currentUser.role}`,
-          url: profileUrl,
-        })
-        .catch(() => {});
+      navigator.share({ title: `${currentUser.name} — ${currentUser.role}`, url: profileUrl }).catch(() => {});
     } else {
       handleCopyLink();
     }
@@ -142,7 +146,29 @@ export function MyCard() {
               }}
             >
               {currentUser.role}
-              {currentUser.company && ` · ${currentUser.company}`}
+              {currentUser.company && (
+                <>
+                  {" · "}
+                  {currentUser.companyUrl ? (
+                    <a
+                      href={currentUser.companyUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: "inherit", textDecoration: "underline", textDecorationColor: "var(--line)" }}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        const tg = (window as any).Telegram?.WebApp;
+                        if (tg?.openLink) tg.openLink(currentUser.companyUrl!);
+                        else window.open(currentUser.companyUrl, "_blank");
+                      }}
+                    >
+                      {currentUser.company}
+                    </a>
+                  ) : (
+                    currentUser.company
+                  )}
+                </>
+              )}
             </div>
           )}
           {currentUser.username && (
@@ -283,8 +309,8 @@ export function MyCard() {
               </>
             ) : (
               <>
-                <Copy className="w-4 h-4" />
-                Скопировать ссылку
+                <Send className="w-4 h-4" />
+                Поделиться профилем
               </>
             )}
           </GhostBtn>

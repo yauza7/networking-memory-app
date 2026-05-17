@@ -1,16 +1,25 @@
 import { useParams, useNavigate, useSearchParams } from "react-router";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { User, Connection } from "../utils/mockData";
-import {
-  MessageCircle, UserPlus, Building2, Globe, Mail, ExternalLink, ArrowLeft, Sparkles, Check,
-} from "lucide-react";
+import { MessageCircle, UserPlus, Globe, Mail, ExternalLink, Check } from "lucide-react";
 import { motion } from "motion/react";
 import { addStoredContact, loadStoredContacts } from "../utils/contactStore";
 import { loadCurrentUser } from "../utils/userStore";
+import { fetchPublicProfile } from "../utils/profileApi";
+import {
+  Atmosphere,
+  Avatar,
+  Hero,
+  IvoryBtn,
+  cardStyle,
+} from "../components/brand/Brand";
 
 const LINK_LABELS: Record<string, string> = {
-  telegram: "Telegram", linkedin: "LinkedIn", instagram: "Instagram",
-  email: "Email", website: "Сайт",
+  telegram: "Telegram",
+  linkedin: "LinkedIn",
+  instagram: "Instagram",
+  email: "Email",
+  website: "Сайт",
 };
 
 function getLinkIcon(type: string) {
@@ -41,7 +50,6 @@ const sanitizePhoto = (v: unknown): string | undefined => {
   }
 };
 
-/** Decode the QR `d` payload (base64-encoded JSON) into a User-like object */
 function decodeProfileFromD(d: string, fallbackUsername: string): User | null {
   try {
     if (d.length > 4000) return null;
@@ -78,19 +86,37 @@ export function PublicProfile() {
   const [saved, setSaved] = useState(false);
 
   const currentUser = loadCurrentUser();
-  const isOwn = currentUser.username === username;
+  const isOwn =
+    !!currentUser.username &&
+    currentUser.username.toLowerCase() === (username || "").toLowerCase();
 
-  const user: User | null = useMemo(() => {
+  const localUser: User | null = useMemo(() => {
     if (isOwn) return currentUser;
     const d = searchParams.get("d");
     if (d) {
       const decoded = decodeProfileFromD(d, username || "");
       if (decoded) return decoded;
     }
-    // Look up in stored contacts as a last resort
     const stored = loadStoredContacts().find((c) => c.user.username === username);
     return stored?.user ?? null;
   }, [searchParams, username, isOwn, currentUser]);
+
+  // Server fetch when no local data and not own profile.
+  const [remoteUser, setRemoteUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState<boolean>(!localUser && !isOwn && !!username);
+  useEffect(() => {
+    if (isOwn || localUser || !username) return;
+    let cancelled = false;
+    setLoading(true);
+    fetchPublicProfile(username).then((u) => {
+      if (cancelled) return;
+      setRemoteUser(u);
+      setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [username, isOwn, localUser]);
+
+  const user: User | null = localUser ?? remoteUser;
 
   const handleSaveContact = () => {
     if (!user || saved || isOwn) return;
@@ -106,9 +132,28 @@ export function PublicProfile() {
     navigate(`/contact/${contactId}`, { replace: true });
   };
 
+  if (!user && loading) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "var(--bg)",
+          color: "var(--ivory)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          position: "relative",
+        }}
+      >
+        <Atmosphere intensity={0.25} />
+        <p className="font-mono" style={{ position: "relative", zIndex: 1, color: "var(--muted-fg)", fontSize: 11, letterSpacing: "0.18em" }}>
+          СИГНАЛ…
+        </p>
+      </div>
+    );
+  }
+
   if (!user) {
-    // If we at least have a username, offer to save them as a bare contact
-    const canSaveByUsername = !!username;
     const handleSaveByUsername = () => {
       if (!username) return;
       const contactId = `c-${Date.now()}`;
@@ -131,175 +176,294 @@ export function PublicProfile() {
     };
 
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6">
-        <div className="w-20 h-20 rounded-full flex items-center justify-center mb-4" style={{ background: "rgba(0,122,255,0.08)" }}>
-          <UserPlus className="w-10 h-10" style={{ color: "#8E8E93" }} />
-        </div>
-        <h2 style={{ fontSize: "22px", fontWeight: 700, color: "#0a1628", marginBottom: "8px" }}>
-          {canSaveByUsername ? `@${username}` : "Профиль не найден"}
-        </h2>
-        <p style={{ fontSize: "14px", color: "#8E8E93", textAlign: "center", marginBottom: "24px" }}>
-          {canSaveByUsername
-            ? "Этот пользователь ещё не в Echo — можно добавить по username"
-            : "Ссылка некорректна или профиль не существует"}
-        </p>
-        {canSaveByUsername && (
-          <button
-            onClick={handleSaveByUsername}
-            className="flex items-center gap-2 px-6 rounded-[14px] text-white font-semibold transition-all active:scale-97 mb-3"
-            style={{ background: "#007AFF", height: "50px", fontSize: "17px", boxShadow: "0 4px 15px rgba(0,122,255,0.3)" }}
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "var(--bg)",
+          color: "var(--ivory)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: "0 24px",
+          gap: 16,
+          textAlign: "center",
+        }}
+      >
+        <Atmosphere intensity={0.3} />
+        <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+          <div
+            style={{
+              width: 72,
+              height: 72,
+              borderRadius: "50%",
+              border: "1.5px solid var(--line-soft)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
           >
-            <UserPlus className="w-5 h-5" />
-            Добавить @{username}
+            <UserPlus style={{ color: "var(--muted-fg)", width: 28, height: 28 }} />
+          </div>
+          <Hero size={22}>{username ? `@${username}` : "Профиль не найден"}</Hero>
+          <p style={{ fontSize: 14, color: "var(--muted-fg)", lineHeight: 1.5, maxWidth: 260, fontFamily: "var(--sans)" }}>
+            {username
+              ? "Этот пользователь ещё не в Echo — можно добавить по username"
+              : "Ссылка некорректна или профиль не существует"}
+          </p>
+          {username && (
+            <IvoryBtn h={48} onClick={handleSaveByUsername}>
+              <UserPlus style={{ width: 16, height: 16 }} />
+              Добавить @{username}
+            </IvoryBtn>
+          )}
+          <button
+            onClick={() => navigate("/", { replace: true })}
+            style={{
+              background: "transparent",
+              border: "1px solid var(--line-soft)",
+              color: "var(--muted-fg)",
+              borderRadius: 14,
+              height: 48,
+              padding: "0 24px",
+              fontFamily: "var(--sans)",
+              fontSize: 15,
+              cursor: "pointer",
+              width: "100%",
+              maxWidth: 320,
+            }}
+          >
+            На главную
           </button>
-        )}
-        <button
-          onClick={() => navigate("/", { replace: true })}
-          className="flex items-center gap-2 px-6 rounded-[14px] font-semibold transition-all active:scale-97"
-          style={{
-            background: "rgba(255,255,255,0.72)",
-            border: "0.5px solid rgba(0,0,0,0.1)",
-            color: "#007AFF",
-            height: "50px",
-            fontSize: "17px",
-          }}
-        >
-          <ArrowLeft className="w-5 h-5" />
-          На главную
-        </button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen pb-8">
-      {/* Back */}
-      <div className="flex items-center justify-between px-4 pt-14 pb-4">
-        <button onClick={() => navigate(-1)} className="flex items-center gap-1 font-medium" style={{ color: "#007AFF", fontSize: "17px" }}>
-          <ArrowLeft className="w-5 h-5" />
-          Назад
-        </button>
-      </div>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "var(--bg)",
+        color: "var(--ivory)",
+        position: "relative",
+        paddingBottom: 40,
+      }}
+    >
+      <Atmosphere intensity={0.25} />
 
-      {/* Hero */}
-      <motion.div
-        className="flex flex-col items-center px-5 pb-6"
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-      >
-        {user.photo ? (
-          <img
-            src={user.photo}
-            alt={user.name}
-            className="w-24 h-24 rounded-full object-cover avatar-ocean mb-4"
-          />
-        ) : (
-          <div
-            className="w-24 h-24 rounded-full flex items-center justify-center text-white text-3xl font-bold avatar-ocean mb-4"
-            style={{ background: "linear-gradient(135deg, #5AC8FA, #007AFF)" }}
+      <div style={{ position: "relative", zIndex: 1 }}>
+        {/* Back */}
+        <div style={{ padding: "56px 18px 0" }}>
+          <button
+            onClick={() => navigate(-1)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              background: "transparent",
+              border: "none",
+              color: "var(--signal)",
+              fontFamily: "var(--sans)",
+              fontSize: 15,
+              cursor: "pointer",
+              padding: 0,
+            }}
           >
-            {user.name[0]}
-          </div>
-        )}
-        <h1 style={{ fontSize: "24px", fontWeight: 700, color: "#0a1628", textAlign: "center" }}>{user.name}</h1>
-        {user.username && <p style={{ fontSize: "14px", color: "#007AFF", marginTop: "2px" }}>@{user.username}</p>}
-        {user.role && <p style={{ fontSize: "15px", color: "#8E8E93", marginTop: "4px", textAlign: "center" }}>{user.role}</p>}
-        {user.company && (
-          <div className="flex items-center gap-1 mt-1" style={{ color: "#8E8E93", fontSize: "13px" }}>
-            <Building2 className="w-3 h-3" />
-            {user.companyUrl
-              ? <a href={user.companyUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#007AFF" }}>{user.company}</a>
-              : <span>{user.company}</span>}
-          </div>
-        )}
-      </motion.div>
+            <svg width="10" height="16" viewBox="0 0 10 16" fill="none">
+              <path d="M8 2L2 8l6 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Назад
+          </button>
+        </div>
 
-      <div className="px-4 space-y-3">
-        {(user.tags?.length > 0 || user.bio || user.links?.length > 0) && (
-          <motion.div
-            className="glass-card overflow-hidden"
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1, duration: 0.4 }}
-          >
-            {user.tags?.length > 0 && (
-              <div className="p-5" style={{ borderBottom: (user.bio || user.links?.length) ? "0.5px solid rgba(0,0,0,0.06)" : "none" }}>
-                <div className="flex flex-wrap gap-1.5">
-                  {user.tags.map((tag) => <span key={tag} className="ios-tag">{tag}</span>)}
-                </div>
+        {/* Hero */}
+        <motion.div
+          style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "28px 22px 20px", textAlign: "center" }}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+        >
+          <Avatar name={user.name} photo={user.photo} username={user.username} size={80} ring />
+          <div style={{ marginTop: 16 }}>
+            <Hero size={26}>{user.name}</Hero>
+            {user.username && (
+              <div className="font-mono" style={{ fontSize: 12, color: "var(--signal-dim)", marginTop: 4, letterSpacing: "0.06em" }}>
+                @{user.username}
               </div>
             )}
-            {user.bio && (
-              <div className="p-5" style={{ borderBottom: user.links?.length ? "0.5px solid rgba(0,0,0,0.06)" : "none" }}>
-                <div className="flex items-start gap-2">
-                  <Sparkles className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: "#007AFF" }} />
-                  <p style={{ fontSize: "14px", color: "#3c3c43", lineHeight: 1.5 }}>{user.bio}</p>
-                </div>
-              </div>
+            {user.role && (
+              <p style={{ fontSize: 14, color: "var(--muted-fg)", marginTop: 6, fontFamily: "var(--sans)" }}>
+                {user.role}
+                {user.company && (
+                  <>
+                    {" · "}
+                    {user.companyUrl ? (
+                      <a
+                        href={user.companyUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ color: "inherit", textDecoration: "underline", textDecorationColor: "var(--line)" }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          const tg = (window as any).Telegram?.WebApp;
+                          if (tg?.openLink) tg.openLink(user.companyUrl!);
+                          else window.open(user.companyUrl, "_blank");
+                        }}
+                      >
+                        {user.company}
+                      </a>
+                    ) : (
+                      user.company
+                    )}
+                  </>
+                )}
+              </p>
             )}
-            {user.links?.length > 0 && (
-              <div className="p-5">
-                <div className="grid grid-cols-2 gap-2">
+          </div>
+        </motion.div>
+
+        <div style={{ padding: "0 16px", display: "flex", flexDirection: "column", gap: 12 }}>
+          {/* Info card */}
+          {(user.tags?.length > 0 || user.bio || user.links?.length > 0) && (
+            <motion.div
+              style={{ ...cardStyle, padding: 0, overflow: "hidden" }}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1, duration: 0.35 }}
+            >
+              {user.bio && (
+                <div
+                  style={{
+                    padding: "16px 18px",
+                    borderBottom: (user.tags?.length > 0 || user.links?.length > 0) ? "1px solid var(--line-soft)" : "none",
+                  }}
+                >
+                  <p style={{ fontSize: 14, color: "var(--ivory)", lineHeight: 1.55, fontFamily: "var(--sans)" }}>{user.bio}</p>
+                </div>
+              )}
+              {user.tags?.length > 0 && (
+                <div
+                  style={{
+                    padding: "14px 18px",
+                    borderBottom: user.links?.length ? "1px solid var(--line-soft)" : "none",
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 6,
+                  }}
+                >
+                  {user.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="font-mono"
+                      style={{
+                        padding: "4px 10px",
+                        borderRadius: 100,
+                        border: "1px solid var(--signal-dim)",
+                        background: "oklch(0.86 0.13 195 / 0.10)",
+                        color: "var(--signal)",
+                        fontSize: 10,
+                        letterSpacing: "0.06em",
+                      }}
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {user.links?.length > 0 && (
+                <div style={{ padding: "14px 18px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                   {user.links.map((link, i) => (
                     <a
                       key={i}
                       href={link.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex items-center gap-2.5 px-3 py-3 rounded-xl transition-all active:scale-97"
-                      style={{ background: "rgba(0,0,0,0.04)", border: "0.5px solid rgba(0,0,0,0.06)", color: "#0a1628" }}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        padding: "10px 12px",
+                        borderRadius: 10,
+                        background: "var(--deep)",
+                        border: "1px solid var(--line-soft)",
+                        color: "var(--signal)",
+                        textDecoration: "none",
+                        fontSize: 13,
+                        fontFamily: "var(--sans)",
+                      }}
                     >
-                      <span style={{ color: "#007AFF" }}>{getLinkIcon(link.type)}</span>
-                      <span style={{ fontSize: "14px", fontWeight: 500 }}>{LINK_LABELS[link.type] || link.type}</span>
+                      {getLinkIcon(link.type)}
+                      <span style={{ color: "var(--ivory)", fontSize: 13 }}>{LINK_LABELS[link.type] || link.type}</span>
                     </a>
                   ))}
                 </div>
-              </div>
+              )}
+            </motion.div>
+          )}
+
+          {/* Actions */}
+          <motion.div
+            style={{ display: "flex", flexDirection: "column", gap: 10 }}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.18, duration: 0.35 }}
+          >
+            {user.username && (
+              <a
+                href={`https://t.me/${user.username}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  height: 52,
+                  borderRadius: 14,
+                  background: "var(--signal)",
+                  color: "var(--abyss)",
+                  fontFamily: "var(--sans)",
+                  fontWeight: 600,
+                  fontSize: 16,
+                  textDecoration: "none",
+                }}
+              >
+                <MessageCircle className="w-5 h-5" />
+                Написать в Telegram
+              </a>
+            )}
+            {!isOwn && (
+              <button
+                onClick={handleSaveContact}
+                disabled={saved}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 8,
+                  height: 52,
+                  borderRadius: 14,
+                  background: "transparent",
+                  border: `1px solid ${saved ? "var(--signal-dim)" : "var(--line)"}`,
+                  color: saved ? "var(--signal)" : "var(--ivory)",
+                  fontFamily: "var(--sans)",
+                  fontWeight: 500,
+                  fontSize: 16,
+                  cursor: saved ? "default" : "pointer",
+                  opacity: saved ? 0.7 : 1,
+                  width: "100%",
+                }}
+              >
+                {saved ? <><Check className="w-5 h-5" /> Сохранено</> : <><UserPlus className="w-5 h-5" /> Сохранить контакт</>}
+              </button>
             )}
           </motion.div>
-        )}
 
-        {/* Actions */}
-        <motion.div
-          className="space-y-2.5"
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.18, duration: 0.4 }}
-        >
-          {user.username && (
-            <a
-              href={`https://t.me/${user.username}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 w-full rounded-[14px] text-white font-semibold transition-all active:scale-97"
-              style={{ background: "#007AFF", height: "50px", fontSize: "17px", boxShadow: "0 4px 15px rgba(0,122,255,0.3)" }}
-            >
-              <MessageCircle className="w-5 h-5" />
-              Написать в Telegram
-            </a>
-          )}
-          {!isOwn && (
-            <button
-              onClick={handleSaveContact}
-              disabled={saved}
-              className="flex items-center justify-center gap-2 w-full rounded-[14px] font-semibold transition-all active:scale-97 disabled:opacity-60"
-              style={{
-                background: saved ? "rgba(52,199,89,0.15)" : "rgba(255,255,255,0.72)",
-                border: "0.5px solid rgba(0,0,0,0.1)",
-                color: saved ? "#34C759" : "#007AFF",
-                height: "50px",
-                fontSize: "17px",
-              }}
-            >
-              {saved ? <><Check className="w-5 h-5" /> Сохранено</> : <><UserPlus className="w-5 h-5" /> Сохранить контакт</>}
-            </button>
-          )}
-        </motion.div>
-
-        <p style={{ textAlign: "center", color: "#C7C7CC", fontSize: "12px", paddingTop: "4px" }}>
-          Профиль создан в Echo
-        </p>
+          <p className="font-mono" style={{ textAlign: "center", color: "var(--faint)", fontSize: 11, paddingTop: 4, letterSpacing: "0.08em" }}>
+            ECHO · EVERY SIGNAL FINDS ITS RECEIVER
+          </p>
+        </div>
       </div>
     </div>
   );

@@ -84,6 +84,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await sendBotMessage(user.chat_id, text, {
       inline_keyboard: [
         [{ text: "📡 Открыть Echo", web_app: { url: APP_URL } }],
+        [
+          { text: "⏰ Напомнить завтра", callback_data: "snooze_1" },
+          { text: "📅 Через неделю", callback_data: "snooze_7" },
+        ],
       ],
     });
 

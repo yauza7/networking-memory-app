@@ -217,7 +217,7 @@ export function Avatar({
           border: ringStyle,
           overflow: "hidden",
           flexShrink: 0,
-          background: `oklch(0.28 0.04 ${hue})`,
+          background: `oklch(var(--avatar-initials-bg-l, 0.28) 0.04 ${hue})`,
         }}
       >
         <img
@@ -241,12 +241,12 @@ export function Avatar({
         width: size,
         height: size,
         borderRadius: "50%",
-        background: `oklch(0.28 0.04 ${hue})`,
+        background: `oklch(var(--avatar-initials-bg-l, 0.28) 0.04 ${hue})`,
         border: ringStyle,
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        color: `oklch(0.92 0.03 ${hue})`,
+        color: `oklch(var(--avatar-initials-text-l, 0.92) 0.03 ${hue})`,
         fontFamily: "var(--sans)",
         fontWeight: 500,
         fontSize: size * 0.38,

@@ -4,7 +4,12 @@ import { AnimatePresence, motion } from "motion/react";
 import { Navigation } from "./components/Navigation";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ensureRegistered } from "./utils/serverSync";
+import { syncContactsFromServer, seedEchoContact } from "./utils/contactStore";
+import { syncTasksFromServer } from "./utils/taskStore";
+import { flushOutbox } from "./utils/outboxStore";
 import { applyTheme, loadTheme } from "./utils/themeStore";
+import { loadCurrentUser } from "./utils/userStore";
+import { pushOwnProfile } from "./utils/profileApi";
 
 import { SplashScreen } from "./screens/SplashScreen";
 import { Setup } from "./screens/Setup";
@@ -24,6 +29,7 @@ import { Tasks } from "./screens/Tasks";
 import { PublicProfile } from "./screens/PublicProfile";
 import { VoiceNote } from "./screens/VoiceNote";
 import { Tour } from "./screens/Tour";
+import { SharedPreview } from "./screens/SharedPreview";
 
 const pageVariants = {
   initial: { opacity: 0, y: 20 },
@@ -62,6 +68,7 @@ function AnimatedRoutes() {
           <Route path="/settings" element={<Settings />} />
           <Route path="/tasks" element={<Tasks />} />
           <Route path="/u/:username" element={<PublicProfile />} />
+          <Route path="/c/:token" element={<SharedPreview />} />
           <Route path="/voice-note" element={<VoiceNote />} />
           <Route path="/tour" element={<Tour />} />
         </Routes>
@@ -73,7 +80,7 @@ function AnimatedRoutes() {
 /** Show navigation only on main app screens (not setup/public profile/tour) */
 function AppShell({ needsSetup }: { needsSetup: boolean }) {
   const location = useLocation();
-  const isPublic = location.pathname.startsWith("/u/");
+  const isPublic = location.pathname.startsWith("/u/") || location.pathname.startsWith("/c/");
   const isSetup = location.pathname === "/setup";
   const isTour = location.pathname === "/tour";
   return (
@@ -106,8 +113,39 @@ export default function App() {
         console.error("Telegram WebApp init failed:", e);
       }
     }
-    // Register chat_id so the cron job can DM reminders
-    ensureRegistered().catch(() => {});
+    // Register chat_id so the cron job can DM reminders, drain any queued
+    // mutations, then pull the contacts delta.
+    (async () => {
+      try { await ensureRegistered(); } catch {}
+      try { await flushOutbox(); } catch {}
+      try { await syncContactsFromServer(); } catch {}
+      try { await syncTasksFromServer(); } catch {}
+      try { await seedEchoContact(); } catch {}
+      // Keep server profile in sync so QR scans always find up-to-date data.
+      try {
+        const u = loadCurrentUser();
+        if (u.username && u.name) {
+          await pushOwnProfile({
+            username: u.username,
+            name: u.name,
+            role: u.role,
+            company: u.company,
+            companyUrl: u.companyUrl,
+            bio: u.bio,
+            tags: u.tags,
+            public: true,
+          });
+        }
+      } catch {}
+    })();
+
+    const onOnline = () => {
+      flushOutbox()
+        .then(() => syncContactsFromServer())
+        .catch(() => {});
+    };
+    window.addEventListener("online", onOnline);
+    return () => window.removeEventListener("online", onOnline);
   }, []);
 
   // Splash screen — shown once per session
@@ -120,9 +158,10 @@ export default function App() {
     () => !localStorage.getItem("w52_profile")
   );
 
-  // After Setup → show full Tour walkthrough (until completed)
+  // After Setup → show full Tour walkthrough (until completed).
+  // Only activate if profile already exists; for new users, Setup's onComplete triggers it.
   const [needsTour, setNeedsTour] = useState(
-    () => !localStorage.getItem("w52_tour_completed")
+    () => !!localStorage.getItem("w52_profile") && !localStorage.getItem("w52_tour_completed")
   );
 
   const handleSplashFinish = () => {
@@ -139,8 +178,9 @@ export default function App() {
     return () => window.removeEventListener("storage", onStorage);
   }, []);
 
-  // Public /u/ routes work even before registration
-  const isPublicRoute = window.location.pathname.startsWith("/u/");
+  // Public routes work even before registration
+  const path = window.location.pathname;
+  const isPublicRoute = path.startsWith("/u/") || path.startsWith("/c/");
 
   return (
     <ErrorBoundary>
@@ -165,6 +205,9 @@ export default function App() {
                     <Setup
                       onComplete={() => {
                         setNeedsSetup(false);
+                        if (!localStorage.getItem("w52_tour_completed")) {
+                          setNeedsTour(true);
+                        }
                       }}
                     />
                   }

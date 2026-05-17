@@ -5,6 +5,7 @@
  */
 import { mockContacts } from "../utils/mockData";
 import { allContacts } from "../utils/contactStore";
+import { useContactsVersion } from "../utils/useContactsVersion";
 import { Link, useSearchParams } from "react-router";
 import {
   Search,
@@ -57,7 +58,11 @@ export function Contacts() {
   const [csvSending, setCsvSending] = useState(false);
   const [csvStatus, setCsvStatus] = useState<"idle" | "sent" | "error">("idle");
 
-  const contacts = allContacts(mockContacts);
+  const contactsVersion = useContactsVersion();
+  const contacts = useMemo(
+    () => allContacts(mockContacts),
+    [contactsVersion]
+  );
 
   // Build event chips dynamically from real data
   const events = useMemo(() => {

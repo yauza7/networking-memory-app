@@ -1,9 +1,23 @@
+/**
+ * /voice-note?id=X — экран голосовой заметки из бота.
+ * Показывает расшифровку, позволяет сохранить к существующему контакту
+ * или создать новый (переход на AddContact с предзаполненной заметкой).
+ */
 import { useEffect, useState, useMemo } from "react";
-import { useSearchParams, useNavigate, Link } from "react-router";
-import { ArrowLeft, Search, Save, Check, Loader2, AlertCircle, UserPlus, Sparkles } from "lucide-react";
-import { motion } from "motion/react";
+import { useSearchParams, useNavigate } from "react-router";
+import { Search, Check, Loader2, UserPlus } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
 import { mockContacts } from "../utils/mockData";
 import { allContacts, loadStoredContacts, saveStoredContacts } from "../utils/contactStore";
+import {
+  Atmosphere,
+  Avatar,
+  RoundBtn,
+  IvoryBtn,
+  AISparkle,
+  Hero,
+  cardStyle,
+} from "../components/brand/Brand";
 
 function getInitData(): string | null {
   try {
@@ -23,7 +37,7 @@ export function VoiceNote() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
-  const [savingId, setSavingId] = useState<string | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!voiceId) {
@@ -33,7 +47,7 @@ export function VoiceNote() {
     }
     const initData = getInitData();
     if (!initData) {
-      setError("Открой эту страницу из Telegram, чтобы получить расшифровку");
+      setError("Открой эту страницу из Telegram");
       setLoading(false);
       return;
     }
@@ -61,179 +75,257 @@ export function VoiceNote() {
       (c) =>
         c.user.name.toLowerCase().includes(q) ||
         c.user.username?.toLowerCase().includes(q) ||
-        c.user.role.toLowerCase().includes(q) ||
+        c.user.role?.toLowerCase().includes(q) ||
         c.user.company?.toLowerCase().includes(q)
     );
   }, [contacts, query]);
 
   const saveToContact = (contactId: string) => {
-    if (!text.trim() || savingId) return;
-    setSavingId(contactId);
+    if (!text.trim() || savedId) return;
     try {
       const stored = loadStoredContacts();
-      const existingIndex = stored.findIndex((c) => c.id === contactId);
-
-      if (existingIndex >= 0) {
-        // Append to existing stored contact's note
-        const c = stored[existingIndex];
+      const idx = stored.findIndex((c) => c.id === contactId);
+      if (idx >= 0) {
+        const c = stored[idx];
         const prev = c.note ? `${c.note}\n\n` : "";
-        stored[existingIndex] = { ...c, note: `${prev}🎙️ ${text.trim()}` };
+        stored[idx] = { ...c, note: `${prev}🎙️ ${text.trim()}` };
         saveStoredContacts(stored);
       } else {
-        // It's a mock contact — clone into stored with the note
         const mock = contacts.find((c) => c.id === contactId);
-        if (mock) {
-          saveStoredContacts([{ ...mock, note: `🎙️ ${text.trim()}` }, ...stored]);
-        }
+        if (mock) saveStoredContacts([{ ...mock, note: `🎙️ ${text.trim()}` }, ...stored]);
       }
-      navigate(`/contact/${contactId}`, { replace: true });
+      setSavedId(contactId);
+      setTimeout(() => navigate(`/contact/${contactId}`, { replace: true }), 600);
     } catch (e) {
       console.error(e);
-      setSavingId(null);
     }
   };
 
+  const handleNewContact = () => {
+    // Pass note via sessionStorage so AddContact can pick it up
+    try { sessionStorage.setItem("pendingVoiceNote", text.trim()); } catch {}
+    navigate("/add-contact?from=voice");
+  };
+
+  // ── Loading ──────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center">
-        <Loader2 className="w-10 h-10 animate-spin mb-3" style={{ color: "#007AFF" }} />
-        <p style={{ color: "#8E8E93", fontSize: "14px" }}>Загружаю расшифровку…</p>
+      <div style={{
+        minHeight: "100vh", background: "var(--bg)", color: "var(--ivory)",
+        display: "flex", flexDirection: "column", alignItems: "center",
+        justifyContent: "center", position: "relative",
+      }}>
+        <Atmosphere intensity={0.25} />
+        <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+          <Loader2 className="w-8 h-8 animate-spin" style={{ color: "var(--signal)" }} />
+          <p className="font-mono" style={{ fontSize: 11, color: "var(--muted-fg)", letterSpacing: "0.18em" }}>
+            ЗАГРУЖАЮ…
+          </p>
+        </div>
       </div>
     );
   }
 
+  // ── Error ────────────────────────────────────────────────────
   if (error) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center">
-        <div className="w-16 h-16 rounded-full flex items-center justify-center mb-3" style={{ background: "rgba(255,59,48,0.12)" }}>
-          <AlertCircle className="w-8 h-8" style={{ color: "#FF3B30" }} />
+      <div style={{
+        minHeight: "100vh", background: "var(--bg)", color: "var(--ivory)",
+        display: "flex", flexDirection: "column", alignItems: "center",
+        justifyContent: "center", padding: "0 24px", gap: 16,
+        textAlign: "center", position: "relative",
+      }}>
+        <Atmosphere intensity={0.25} />
+        <div style={{ position: "relative", zIndex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+          <Hero size={22}>Не получилось</Hero>
+          <p style={{ fontSize: 14, color: "var(--muted-fg)", lineHeight: 1.5, maxWidth: 280, fontFamily: "var(--sans)" }}>
+            {error}
+          </p>
+          <IvoryBtn h={48} onClick={() => navigate("/", { replace: true })}>
+            На главную
+          </IvoryBtn>
         </div>
-        <h2 style={{ fontSize: "20px", fontWeight: 700, color: "#0a1628", marginBottom: 8 }}>Не получилось</h2>
-        <p style={{ fontSize: "14px", color: "#8E8E93", maxWidth: 320, marginBottom: 24 }}>{error}</p>
-        <button
-          onClick={() => navigate("/", { replace: true })}
-          className="rounded-[14px] text-white font-semibold px-6"
-          style={{ background: "#007AFF", height: 48, fontSize: 16 }}
-        >
-          На главную
-        </button>
       </div>
     );
   }
 
+  // ── Main ─────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen pb-8">
-      {/* Header */}
-      <div className="flex items-center gap-3 px-4 pt-14 pb-4">
-        <button onClick={() => navigate(-1)} style={{ color: "#007AFF" }}>
-          <ArrowLeft className="w-5 h-5" />
-        </button>
-        <div>
-          <h1 style={{ fontSize: "24px", fontWeight: 700, color: "#0a1628", letterSpacing: "-0.3px" }}>
-            Голосовая заметка
-          </h1>
-          <p style={{ fontSize: "13px", color: "#8E8E93" }}>
-            Выберите контакт, к которому сохранить
-          </p>
-        </div>
-      </div>
+    <div style={{
+      minHeight: "100vh", background: "var(--bg)", color: "var(--ivory)",
+      position: "relative", paddingBottom: 48,
+    }}>
+      <Atmosphere intensity={0.25} />
 
-      <div className="px-4 space-y-3">
-        {/* Transcription */}
-        <motion.div
-          className="glass-card p-5"
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.05 }}
-        >
-          <div className="flex items-center gap-2 mb-3">
-            <Sparkles className="w-4 h-4" style={{ color: "#007AFF" }} />
-            <p style={{ fontSize: "12px", fontWeight: 600, color: "#8E8E93", textTransform: "uppercase", letterSpacing: "0.5px" }}>
-              Расшифровка (можно отредактировать)
+      <div style={{ position: "relative", zIndex: 1 }}>
+        {/* Top bar */}
+        <div style={{ padding: "56px 18px 0", display: "flex", alignItems: "center", gap: 12 }}>
+          <RoundBtn onClick={() => navigate(-1)}>
+            <svg width="10" height="14" viewBox="0 0 10 14">
+              <path d="M8 1L2 7l6 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            </svg>
+          </RoundBtn>
+          <div>
+            <Hero size={22}>Голосовая заметка</Hero>
+            <p style={{ fontSize: 12, color: "var(--muted-fg)", fontFamily: "var(--sans)", marginTop: 2 }}>
+              Выберите контакт или создайте новый
             </p>
           </div>
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value.slice(0, 2000))}
-            rows={6}
-            className="w-full px-4 py-3 text-sm resize-none"
-            placeholder="Расшифрованный текст появится здесь…"
-          />
-          <p style={{ fontSize: "12px", color: "#8E8E93", marginTop: "6px" }}>{text.length}/2000</p>
-        </motion.div>
-
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: "#8E8E93" }} />
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Поиск контакта…"
-            className="w-full pl-9 pr-4 py-2.5 text-sm"
-            style={{ borderRadius: "12px" }}
-          />
         </div>
 
-        {/* Contacts */}
-        <div className="space-y-2">
-          {filteredContacts.length === 0 ? (
-            <div className="glass-card p-6 text-center">
-              <UserPlus className="w-10 h-10 mx-auto mb-3" style={{ color: "#8E8E93" }} />
-              <p style={{ fontSize: "14px", color: "#0a1628", fontWeight: 600 }}>Нет контактов</p>
-              <p style={{ fontSize: "13px", color: "#8E8E93", marginTop: "4px", marginBottom: "12px" }}>
-                Сначала отсканируйте QR или добавьте контакт вручную
-              </p>
-              <Link
-                to="/scan"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-[14px] text-white text-sm font-semibold"
-                style={{ background: "#007AFF" }}
-              >
-                Сканировать QR
-              </Link>
+        <div style={{ padding: "20px 16px 0", display: "flex", flexDirection: "column", gap: 12 }}>
+          {/* Transcription card */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{ ...cardStyle, padding: 18 }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <AISparkle size={12} />
+              <span className="eyebrow" style={{ color: "var(--signal)" }}>
+                РАСШИФРОВКА (МОЖНО ОТРЕДАКТИРОВАТЬ)
+              </span>
             </div>
-          ) : (
-            filteredContacts.slice(0, 30).map((c, i) => (
-              <motion.button
-                key={c.id}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.03 * Math.min(i, 10) }}
-                onClick={() => saveToContact(c.id)}
-                disabled={!!savingId || !text.trim()}
-                className="w-full glass-card flex items-center gap-3 p-3 text-left transition-all active:scale-[0.99] disabled:opacity-50"
-              >
-                {c.user.photo ? (
-                  <img src={c.user.photo} alt={c.user.name} className="w-10 h-10 rounded-full object-cover avatar-ocean flex-shrink-0" />
-                ) : (
-                  <div
-                    className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0 avatar-ocean"
-                    style={{ background: "linear-gradient(135deg, #5AC8FA, #007AFF)", fontSize: "15px" }}
-                  >
-                    {c.user.name[0]}
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  <p style={{ fontWeight: 600, fontSize: "14px", color: "#0a1628" }}>{c.user.name}</p>
-                  <p style={{ fontSize: "12px", color: "#8E8E93" }} className="truncate">
-                    {c.user.role}{c.user.company && ` · ${c.user.company}`}
-                  </p>
-                </div>
-                {savingId === c.id ? (
-                  <Check className="w-5 h-5 flex-shrink-0" style={{ color: "#34C759" }} />
-                ) : (
-                  <Save className="w-4 h-4 flex-shrink-0" style={{ color: "#007AFF" }} />
-                )}
-              </motion.button>
-            ))
-          )}
-        </div>
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value.slice(0, 2000))}
+              rows={5}
+              style={{
+                width: "100%",
+                background: "var(--bg)",
+                border: "1px solid var(--line-soft)",
+                borderRadius: 12,
+                padding: "12px 14px",
+                color: "var(--ivory)",
+                fontFamily: "var(--sans)",
+                fontSize: 14.5,
+                lineHeight: 1.55,
+                resize: "none",
+                outline: "none",
+                boxSizing: "border-box",
+              }}
+            />
+            <p className="font-mono" style={{ fontSize: 10, color: "var(--faint)", marginTop: 6, letterSpacing: "0.08em" }}>
+              {text.length}/2000
+            </p>
+          </motion.div>
 
-        {!text.trim() && (
-          <p style={{ fontSize: "12px", color: "#FF3B30", textAlign: "center", marginTop: "8px" }}>
-            Расшифровка пустая — добавьте текст, чтобы сохранить
-          </p>
-        )}
+          {/* New contact button */}
+          <motion.button
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.08 }}
+            onClick={handleNewContact}
+            disabled={!text.trim()}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              height: 48, borderRadius: 14,
+              background: "transparent",
+              border: "1px solid var(--signal-dim)",
+              color: "var(--signal)",
+              fontFamily: "var(--sans)", fontWeight: 600, fontSize: 14,
+              cursor: text.trim() ? "pointer" : "default",
+              opacity: text.trim() ? 1 : 0.4,
+            }}
+          >
+            <UserPlus className="w-4 h-4" />
+            Создать новый контакт
+          </motion.button>
+
+          {/* Divider */}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />
+            <span className="font-mono" style={{ fontSize: 10, color: "var(--faint)", letterSpacing: "0.18em" }}>
+              ИЛИ К СУЩЕСТВУЮЩЕМУ
+            </span>
+            <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />
+          </div>
+
+          {/* Search */}
+          <div style={{ position: "relative" }}>
+            <Search className="w-4 h-4" style={{
+              position: "absolute", left: 13, top: "50%",
+              transform: "translateY(-50%)", color: "var(--muted-fg)", pointerEvents: "none",
+            }} />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Поиск контакта…"
+              style={{
+                width: "100%",
+                padding: "11px 14px 11px 38px",
+                background: "var(--deep)",
+                border: "1px solid var(--line-soft)",
+                borderRadius: 12,
+                color: "var(--ivory)",
+                fontFamily: "var(--sans)",
+                fontSize: 14,
+                outline: "none",
+                boxSizing: "border-box",
+              }}
+            />
+          </div>
+
+          {/* Contacts list */}
+          <AnimatePresence mode="popLayout">
+            {filteredContacts.length === 0 ? (
+              <motion.div
+                key="empty"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                style={{ ...cardStyle, padding: 24, textAlign: "center" }}
+              >
+                <p style={{ fontFamily: "var(--sans)", fontSize: 14, color: "var(--muted-fg)" }}>
+                  Контакты не найдены
+                </p>
+              </motion.div>
+            ) : (
+              filteredContacts.slice(0, 30).map((c, i) => (
+                <motion.button
+                  key={c.id}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.03 * Math.min(i, 8) }}
+                  onClick={() => saveToContact(c.id)}
+                  disabled={!!savedId || !text.trim()}
+                  style={{
+                    width: "100%",
+                    ...cardStyle,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                    padding: "12px 14px",
+                    textAlign: "left",
+                    cursor: savedId || !text.trim() ? "default" : "pointer",
+                    opacity: savedId && savedId !== c.id ? 0.4 : 1,
+                    transition: "opacity 0.2s",
+                  }}
+                >
+                  <Avatar name={c.user.name} photo={c.user.photo} username={c.user.username} size={40} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontFamily: "var(--sans)", fontWeight: 600, fontSize: 14, color: "var(--ivory)", margin: 0 }}>
+                      {c.user.name}
+                    </p>
+                    {(c.user.role || c.user.company) && (
+                      <p style={{ fontFamily: "var(--sans)", fontSize: 12, color: "var(--muted-fg)", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {[c.user.role, c.user.company].filter(Boolean).join(" · ")}
+                      </p>
+                    )}
+                  </div>
+                  {savedId === c.id ? (
+                    <Check className="w-5 h-5 flex-shrink-0" style={{ color: "var(--signal)" }} />
+                  ) : (
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0, color: "var(--signal-dim)" }}>
+                      <path d="M2 14V11.5L10.5 3l2.5 2.5L4.5 14H2z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round"/>
+                      <path d="M8.5 5l2.5 2.5" stroke="currentColor" strokeWidth="1.4"/>
+                    </svg>
+                  )}
+                </motion.button>
+              ))
+            )}
+          </AnimatePresence>
+        </div>
       </div>
     </div>
   );

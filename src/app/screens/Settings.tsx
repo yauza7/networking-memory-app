@@ -64,8 +64,10 @@ function clearData() {
     localStorage.removeItem("w52_profile");
     localStorage.removeItem("w52_tasks");
     localStorage.removeItem("w52_followup_sent");
+    localStorage.removeItem("w52_notifications");
     localStorage.removeItem("w52_notifications_read");
     localStorage.removeItem("w52_contacts");
+    localStorage.removeItem("w52_contacts_sync_cursor");
     window.location.href = "/";
   }
 }

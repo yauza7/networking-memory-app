@@ -301,7 +301,7 @@ export function Scanner() {
             height: 260,
             borderRadius: 24,
             border: "1px solid var(--line)",
-            background: "oklch(0.16 0.025 230)",
+            background: "var(--scanner-dark-bg)",
             overflow: "hidden",
           }}
         >
@@ -393,7 +393,7 @@ export function Scanner() {
                     justifyContent: "center",
                     padding: "0 22px",
                     textAlign: "center",
-                    background: "oklch(0.18 0.04 200 / 0.95)",
+                    background: "var(--bg)",
                   }}
                 >
                   <div

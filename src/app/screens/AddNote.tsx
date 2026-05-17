@@ -18,13 +18,16 @@ import {
   cardStyle,
 } from "../components/brand/Brand";
 
-const SYSTEM_PROMPT = `You are a networking assistant for affiliate marketing industry.
-Extract key information from a meeting note.
-Return ONLY valid JSON, no markdown, no explanation:
+const SYSTEM_PROMPT = `Ты — AI-ассистент для нетворкинга в индустрии арбитража трафика и партнёрского маркетинга.
+
+Контекст индустрии: люди здесь занимаются закупкой платного трафика (Facebook Ads, UAC, TikTok, PPC), продвижением офферов по вертикалям (нутра, гемблинг, беттинг, крипто, финансы, дейтинг), работают с партнёрскими сетями (CPA-сети), создают прилы (мобильные приложения), занимаются клоакингом, управляют командами медиабаеров. Основные конференции: MAC, GGate, BROCONF, AffHub. Типичные роли: медиабаер, аффилиат-менеджер, тимлид, CEO арбитражной команды, владелец CPA-сети, разработчик трекеров/прил, HR в арб-команде.
+
+Твоя задача: извлечь ключевую информацию из заметки о встрече.
+Верни ТОЛЬКО валидный JSON, без markdown, без пояснений:
 {
-  "summary": "string (1-2 sentences in Russian describing the person)",
-  "tags": ["string array (3-7 tags from: iGaming, Nutra, Finance, Crypto, Dating, E-commerce, Media Buyer, Affiliate Manager, Advertiser, Recruiter, Founder, Team Lead, LATAM, Tier-1, Europe, CIS, Asia, Payments, AI, SaaS, Hiring, Gambling)"],
-  "followUpDays": "number (3, 5, 7, or 14)"
+  "summary": "строка (1-2 предложения на русском — кто этот человек и о чём договорились/говорили)",
+  "tags": ["массив строк (3-7 тегов из: Buying, Платёжки, Разработка, Партнёрская сеть, Прилы, Аккаунты, Трекеры, HR, PR, Дизайн, FB, UAC, PPC, SEO, ASO, TikTok Ads, Influence, Email, SMS, УБТ, Нутра, Gambling, Betting, Adult, Финансы, Crypto, Founder, Team Lead, Hiring)"],
+  "followUpDays": число (3, 5, 7 или 14 — в зависимости от срочности договорённостей)
 }`;
 
 interface AIResult {
@@ -33,7 +36,11 @@ interface AIResult {
   followUpDays: number;
 }
 
-async function analyzeNote(text: string): Promise<AIResult> {
+async function analyzeNote(text: string, existingSummary?: string): Promise<AIResult> {
+  const userContent = existingSummary
+    ? `Существующая информация о человеке: ${existingSummary}\n\nНовая заметка о встрече: ${text}`
+    : text;
+
   const response = await fetch("/api/anthropic/v1/messages", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -41,7 +48,7 @@ async function analyzeNote(text: string): Promise<AIResult> {
       model: "claude-sonnet-4-20250514",
       max_tokens: 512,
       system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: text }],
+      messages: [{ role: "user", content: userContent }],
     }),
   });
   if (!response.ok) throw new Error(`API ${response.status}`);
@@ -50,6 +57,11 @@ async function analyzeNote(text: string): Promise<AIResult> {
     .replace(/```json\n?|\n?```/g, "")
     .trim();
   return JSON.parse(raw) as AIResult;
+}
+
+/** Strip the live-transcript marker that SpeechRecognition injects into the textarea */
+function cleanVoiceMarker(text: string): string {
+  return text.replace(/\[…голосом\]\s*/g, "").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 function getInitData(): string | null {
@@ -81,6 +93,12 @@ async function transcribeBlob(blob: Blob): Promise<string | null> {
   }
 }
 
+/**
+ * Module-level audio stream — persists across component remounts within the
+ * same SPA session so the browser only asks for mic permission once.
+ */
+let _sharedStream: MediaStream | null = null;
+
 export function AddNote() {
   const [searchParams] = useSearchParams();
   const contactId = searchParams.get("contact") || "";
@@ -100,7 +118,6 @@ export function AddNote() {
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const streamRef = useRef<MediaStream | null>(null);
   const recognitionRef = useRef<any>(null);
   const liveTranscriptRef = useRef<string>("");
 
@@ -109,13 +126,6 @@ export function AddNote() {
     if (isRecording) t = setInterval(() => setRecordingSecs((s) => s + 1), 1000);
     return () => clearInterval(t);
   }, [isRecording]);
-
-  useEffect(
-    () => () => {
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-    },
-    []
-  );
 
   const fmt = (s: number) =>
     `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
@@ -175,13 +185,12 @@ export function AddNote() {
     }
 
     try {
-      // Reuse existing stream if still active to avoid re-prompting for permission
-      let stream = streamRef.current;
-      const tracksLive = stream?.getTracks().some((t) => t.readyState === "live");
-      if (!stream || !tracksLive) {
-        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        streamRef.current = stream;
+      // Reuse the module-level stream so the browser never re-prompts within a session.
+      const tracksLive = _sharedStream?.getTracks().some((t) => t.readyState === "live");
+      if (!_sharedStream || !tracksLive) {
+        _sharedStream = await navigator.mediaDevices.getUserMedia({ audio: true });
       }
+      const stream = _sharedStream;
       chunksRef.current = [];
       const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
         ? "audio/webm;codecs=opus"
@@ -194,14 +203,15 @@ export function AddNote() {
         if (e.data.size > 0) chunksRef.current.push(e.data);
       };
       mr.onstop = async () => {
-        // Keep the stream alive for re-use within this session — no re-prompts.
         const blob = new Blob(chunksRef.current, {
           type: mr.mimeType || "audio/webm",
         });
         setAudioBlob(blob);
         setIsRecording(false);
         const initData = getInitData();
-        if (initData) {
+        // Use server Whisper only as a fallback when the browser's live
+        // SpeechRecognition produced nothing — avoids double transcription.
+        if (initData && !liveTranscriptRef.current.trim()) {
           setIsTranscribing(true);
           const text = await transcribeBlob(blob);
           setIsTranscribing(false);
@@ -235,31 +245,34 @@ export function AddNote() {
   const handleSave = async () => {
     if (!textNote.trim() && !audioBlob) return;
     setStep("processing");
-    const noteText = textNote.trim();
+    // Strip the live SpeechRecognition marker before saving
+    const noteText = cleanVoiceMarker(textNote);
     if (!noteText) {
       setStep("done_no_ai");
       return;
     }
+    const current = contactId
+      ? allContacts(mockContacts).find((c) => c.id === contactId)
+      : null;
     if (contactId) {
-      const existing = allContacts(mockContacts).find((c) => c.id === contactId);
-      const prev = existing?.note ? `${existing.note}\n\n` : "";
+      const prev = current?.note ? `${current.note}\n\n` : "";
       updateStoredContact(contactId, { note: `${prev}${noteText}` });
     }
     try {
-      const result = await analyzeNote(noteText);
+      const result = await analyzeNote(noteText, current?.aiSummary);
       if (contactId) {
         const dueDate = new Date(
           Date.now() + (result.followUpDays ?? 7) * 86400_000
         )
           .toISOString()
           .split("T")[0];
-        const current = allContacts(mockContacts).find(
-          (c) => c.id === contactId
-        );
+        // Merge new tags with existing ones (deduplicate)
+        const existingTags = current?.user?.tags ?? [];
+        const mergedTags = Array.from(new Set([...existingTags, ...(result.tags ?? [])]));
         updateStoredContact(contactId, {
           aiSummary: result.summary,
           followUpDate: dueDate,
-          user: { ...(current?.user as any), tags: result.tags ?? [] },
+          user: { ...(current?.user as any), tags: mergedTags },
         });
       }
       setAiResult(result);

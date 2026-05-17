@@ -7,13 +7,15 @@
  */
 import { useParams, useNavigate, Link } from "react-router";
 import { mockContacts } from "../utils/mockData";
-import { allContacts, removeStoredContact, updateStoredContact } from "../utils/contactStore";
+import { allContacts, removeStoredContact, updateStoredContact, refreshContactSelf } from "../utils/contactStore";
+import { useContactsVersion } from "../utils/useContactsVersion";
 import { loadCurrentUser } from "../utils/userStore";
-import { loadTasks, saveTasks } from "../utils/taskStore";
-import { Trash2, Mic, Send, X, MessageCircle } from "lucide-react";
+import { loadTasks, saveTasks, addTask } from "../utils/taskStore";
+import { Trash2, Mic, Send, X, MessageCircle, Share2, Check } from "lucide-react";
+import { createShare } from "../utils/shareApi";
 import { formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Atmosphere,
@@ -59,15 +61,34 @@ function sortTags(tags: string[]): string[] {
 export function ContactDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const contact = allContacts(mockContacts).find((c) => c.id === id);
+  const contactsVersion = useContactsVersion();
+  const contact = useMemo(
+    () => allContacts(mockContacts).find((c) => c.id === id),
+    [id, contactsVersion]
+  );
   const currentUser = loadCurrentUser();
 
   const [tasks, setTasks] = useState(() =>
     loadTasks().filter((t) => t.contactId === id)
   );
+  const [addingTask, setAddingTask] = useState(false);
+  const [newTaskText, setNewTaskText] = useState("");
+  const [newTaskDate, setNewTaskDate] = useState(() =>
+    new Date(Date.now() + 3 * 86400_000).toISOString().split("T")[0]
+  );
   const [tags, setTags] = useState<string[]>(() => contact?.user.tags ?? []);
   const [tagPickerOpen, setTagPickerOpen] = useState(false);
   const [customTagText, setCustomTagText] = useState("");
+  const [shareState, setShareState] = useState<"idle" | "creating" | "copied">("idle");
+  const [aiDraftText, setAiDraftText] = useState<string | null>(null);
+  const [aiDraftLoading, setAiDraftLoading] = useState(false);
+
+  // Background-refresh the contact's self-layer (name/role/company/photo/bio)
+  // if they're a registered Echo user. Throttled once per username per session.
+  useEffect(() => {
+    if (!contact || !contact.user.username) return;
+    void refreshContactSelf(contact);
+  }, [contact?.id, contact?.user.username]);
   const [noteEditing, setNoteEditing] = useState(false);
   const [noteText, setNoteText] = useState<string>(() => contact?.note ?? "");
 
@@ -131,6 +152,13 @@ export function ContactDetail() {
 
   const handleSendFollowUp = () => {
     if (!contact.user.username) return;
+    const msg = aiDraftText ?? buildFallbackDraft();
+    window.open(
+      `https://t.me/${contact.user.username}?text=${encodeURIComponent(msg)}`
+    );
+  };
+
+  const buildFallbackDraft = () => {
     const firstName = contact.user.name.split(" ")[0];
     const lines: string[] = [`Привет ${firstName}!`, ""];
     const myIntro = [currentUser.name, currentUser.role, currentUser.company]
@@ -143,10 +171,91 @@ export function ContactDetail() {
       lines.push(`\nПомню, ты ${contact.aiSummary.toLowerCase()}.`);
     if (currentUser.bio) lines.push(`\n${currentUser.bio}`);
     lines.push("\nДавай продолжим общение!");
-    const message = lines.join("\n");
-    window.open(
-      `https://t.me/${contact.user.username}?text=${encodeURIComponent(message)}`
-    );
+    return lines.join("\n");
+  };
+
+  const generateAiDraft = async () => {
+    setAiDraftLoading(true);
+    try {
+      const firstName = contact.user.name.split(" ")[0];
+      const senderParts = [currentUser.name, currentUser.role, currentUser.company].filter(Boolean);
+      const recipientParts = [contact.user.role, contact.user.company].filter(Boolean);
+
+      const context = [
+        `Отправитель: ${senderParts.join(", ") || "не указан"}`,
+        currentUser.bio ? `О себе: ${currentUser.bio}` : null,
+        `Получатель: ${contact.user.name}${recipientParts.length ? `, ${recipientParts.join(", ")}` : ""}`,
+        contact.event ? `Где познакомились: ${contact.event}` : null,
+        contact.aiSummary ? `Контекст встречи (AI-сводка): ${contact.aiSummary}` : null,
+        contact.note ? `Заметки: ${contact.note}` : null,
+        contact.user.tags?.length ? `Теги контакта: ${contact.user.tags.join(", ")}` : null,
+      ].filter(Boolean).join("\n");
+
+      const response = await fetch("/api/anthropic/v1/messages", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 400,
+          system: `Ты помогаешь нетворкерам в индустрии арбитража трафика и партнёрского маркетинга написать первое follow-up сообщение в Telegram после знакомства.
+
+СТРОГОЕ ПРАВИЛО: используй ТОЛЬКО факты из предоставленного контекста. Никогда не придумывай место знакомства, название конференции, детали разговора или договорённости, если они явно не указаны в данных. Если поле отсутствует — просто не упоминай его.
+
+Напиши короткое живое сообщение — 3-5 предложений. Включи: приветствие по имени, кто пишет (роль/компания отправителя), и предложение продолжить общение. Добавь контекст знакомства и тему разговора ТОЛЬКО если они есть в данных. Тон: дружелюбный, неформальный, по-человечески. Без канцелярита, без "рад знакомству", "надеюсь на сотрудничество". Верни ТОЛЬКО текст сообщения, без кавычек, без пояснений.`,
+          messages: [{ role: "user", content: context }],
+        }),
+      });
+      if (!response.ok) throw new Error("API error");
+      const data = await response.json();
+      const text = (data.content?.[0]?.text ?? "").trim();
+      if (text) setAiDraftText(text);
+      else setAiDraftText(buildFallbackDraft());
+    } catch {
+      setAiDraftText(buildFallbackDraft());
+    } finally {
+      setAiDraftLoading(false);
+    }
+  };
+
+  const handleShare = async () => {
+    if (shareState !== "idle" || !contact) return;
+    const tg = (window as any).Telegram?.WebApp;
+
+    // If contact has a username and we're in Telegram — share via inline query
+    // so recipient gets a web_app button (opens inside Telegram, not browser)
+    if (contact.user.username && tg?.switchInlineQuery) {
+      try {
+        tg.switchInlineQuery("@" + contact.user.username, ["users", "groups", "channels"]);
+        return;
+      } catch {}
+    }
+
+    // Fallback: create share token → copy/share URL
+    setShareState("creating");
+    const token = await createShare(contact, contact.aiSummary || contact.note || "");
+    if (!token) {
+      setShareState("idle");
+      alert("Не получилось создать ссылку. Попробуй позже.");
+      return;
+    }
+    const url = `${window.location.origin}/c/${token}`;
+    const text = `Знакомься: ${contact.user.name}${contact.user.username ? ` (@${contact.user.username})` : ""}`;
+    if (tg?.openTelegramLink) {
+      try {
+        tg.openTelegramLink(`https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`);
+        setShareState("copied");
+        setTimeout(() => setShareState("idle"), 1800);
+        return;
+      } catch {}
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareState("copied");
+      setTimeout(() => setShareState("idle"), 1800);
+    } catch {
+      window.prompt("Ссылка для отправки:", url);
+      setShareState("idle");
+    }
   };
 
   const metAt = new Date(contact.metAt);
@@ -225,7 +334,29 @@ export function ContactDetail() {
               }}
             >
               {contact.user.role}
-              {contact.user.company && ` · ${contact.user.company}`}
+              {contact.user.company && (
+                <>
+                  {" · "}
+                  {contact.user.companyUrl ? (
+                    <a
+                      href={contact.user.companyUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: "inherit", textDecoration: "underline", textDecorationColor: "var(--line)" }}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        const tg = (window as any).Telegram?.WebApp;
+                        if (tg?.openLink) tg.openLink(contact.user.companyUrl!);
+                        else window.open(contact.user.companyUrl, "_blank");
+                      }}
+                    >
+                      {contact.user.company}
+                    </a>
+                  ) : (
+                    contact.user.company
+                  )}
+                </>
+              )}
             </div>
           )}
           {contact.user.username && (
@@ -241,11 +372,27 @@ export function ContactDetail() {
               @{contact.user.username}
             </div>
           )}
+          {contact.user.bio && (
+            <div style={{ padding: "14px 22px 0" }}>
+              <p
+                style={{
+                  fontSize: 14,
+                  lineHeight: 1.6,
+                  margin: 0,
+                  color: "var(--warm)",
+                  fontFamily: "var(--sans)",
+                  textAlign: "center",
+                }}
+              >
+                {contact.user.bio}
+              </p>
+            </div>
+          )}
         </motion.div>
 
-        {/* Primary CTA only — no "Поделиться визиткой" */}
-        {contact.user.username && (
-          <div style={{ padding: "22px 22px 0" }}>
+        {/* Primary CTAs */}
+        <div style={{ padding: "22px 22px 0", display: "flex", flexDirection: "column", gap: 10 }}>
+          {contact.user.username && (
             <IvoryBtn
               h={50}
               onClick={() =>
@@ -255,6 +402,84 @@ export function ContactDetail() {
               <MessageCircle className="w-4 h-4" />
               Написать в Telegram
             </IvoryBtn>
+          )}
+          <button
+            onClick={handleShare}
+            disabled={shareState === "creating"}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              height: 46, borderRadius: 14,
+              background: "transparent",
+              border: "1px solid var(--line)",
+              color: shareState === "copied" ? "var(--signal)" : "var(--ivory)",
+              fontFamily: "var(--sans)", fontWeight: 500, fontSize: 15,
+              cursor: shareState === "creating" ? "default" : "pointer",
+              opacity: shareState === "creating" ? 0.6 : 1,
+              width: "100%",
+            }}
+          >
+            {shareState === "copied" ? (
+              <><Check className="w-4 h-4" /> Ссылка скопирована</>
+            ) : (
+              <><Share2 className="w-4 h-4" /> Поделиться профилем</>
+            )}
+          </button>
+        </div>
+
+        {/* sharedFrom — who passed this contact along */}
+        {contact.sharedFrom && contact.sharedFrom.length > 0 && (
+          <div style={{ marginTop: 22 }}>
+            <SectionLabel>Поделились</SectionLabel>
+            <div style={{ padding: "0 22px", display: "flex", flexDirection: "column", gap: 8 }}>
+              {contact.sharedFrom.map((s, i) => (
+                <div
+                  key={`${s.fromUsername}-${s.sharedAt}-${i}`}
+                  style={{
+                    ...cardStyle,
+                    padding: "12px 14px",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ivory)" }}>
+                      {s.fromName}
+                      {s.fromUsername && (
+                        <span className="font-mono" style={{ fontWeight: 400, color: "var(--signal-dim)", marginLeft: 6, fontSize: 11 }}>
+                          @{s.fromUsername}
+                        </span>
+                      )}
+                    </span>
+                    <span className="font-mono" style={{ fontSize: 10, color: "var(--faint)", letterSpacing: "0.06em" }}>
+                      {formatDistanceToNow(new Date(s.sharedAt), { addSuffix: true, locale: ru })}
+                    </span>
+                  </div>
+                  {s.sharedNote && (
+                    <p style={{ fontSize: 13, color: "var(--muted-fg)", marginTop: 6, lineHeight: 1.45, fontFamily: "var(--sans)" }}>
+                      {s.sharedNote}
+                    </p>
+                  )}
+                  {s.sharedTags.length > 0 && (
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 8 }}>
+                      {s.sharedTags.map((t) => (
+                        <span
+                          key={t}
+                          className="font-mono"
+                          style={{
+                            padding: "2px 8px",
+                            borderRadius: 100,
+                            border: "1px solid var(--line-soft)",
+                            color: "var(--muted-fg)",
+                            fontSize: 9.5,
+                            letterSpacing: "0.06em",
+                          }}
+                        >
+                          {t}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -419,8 +644,8 @@ export function ContactDetail() {
             <div
               style={{
                 ...cardStyle,
-                background: "oklch(0.20 0.04 200 / 0.50)",
-                border: "1px solid oklch(0.50 0.10 195 / 0.30)",
+                background: "var(--card-ai-bg)",
+                border: "1px solid var(--card-ai-border)",
               }}
             >
               <div
@@ -437,8 +662,7 @@ export function ContactDetail() {
                 </span>
               </div>
               <p
-                className="font-serif"
-                style={{ fontSize: 15.5, margin: 0, lineHeight: 1.5 }}
+                style={{ fontSize: 14.5, margin: 0, lineHeight: 1.6, fontFamily: "var(--sans)", color: "var(--ivory)" }}
               >
                 {contact.aiSummary}
               </p>
@@ -450,12 +674,21 @@ export function ContactDetail() {
         <div style={{ marginTop: 22 }}>
           <SectionLabel
             right={
-              <Link
-                to="/tasks"
-                style={{ color: "inherit", textDecoration: "none" }}
+              <button
+                onClick={() => { setAddingTask(true); setNewTaskText(""); }}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "inherit",
+                  fontFamily: "var(--mono)",
+                  fontSize: "inherit",
+                  letterSpacing: "inherit",
+                  cursor: "pointer",
+                  padding: 0,
+                }}
               >
                 + ДОБАВИТЬ
-              </Link>
+              </button>
             }
           >
             Задачи
@@ -564,6 +797,115 @@ export function ContactDetail() {
                 );
               })
             )}
+
+            {/* Inline add-task form */}
+            <AnimatePresence>
+              {addingTask && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  style={{ overflow: "hidden", marginTop: 14 }}
+                >
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <input
+                      autoFocus
+                      type="text"
+                      value={newTaskText}
+                      onChange={(e) => setNewTaskText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Escape") setAddingTask(false);
+                      }}
+                      placeholder="Описание задачи…"
+                      style={{
+                        width: "100%",
+                        padding: "10px 12px",
+                        background: "var(--deep)",
+                        border: "1px solid var(--signal-dim)",
+                        borderRadius: 12,
+                        color: "var(--ivory)",
+                        fontFamily: "var(--sans)",
+                        fontSize: 14,
+                        outline: "none",
+                        boxSizing: "border-box",
+                      }}
+                    />
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <input
+                        type="date"
+                        value={newTaskDate}
+                        onChange={(e) => setNewTaskDate(e.target.value)}
+                        style={{
+                          flex: 1,
+                          padding: "9px 12px",
+                          background: "var(--deep)",
+                          border: "1px solid var(--line-soft)",
+                          borderRadius: 12,
+                          color: "var(--ivory)",
+                          fontFamily: "var(--sans)",
+                          fontSize: 13,
+                          outline: "none",
+                          colorScheme: "dark",
+                        }}
+                      />
+                      <button
+                        onClick={() => {
+                          if (!newTaskText.trim()) { setAddingTask(false); return; }
+                          const t = {
+                            id: `task-${Date.now()}`,
+                            contactId: contact.id,
+                            contactName: contact.user.name,
+                            contactUsername: contact.user.username,
+                            text: newTaskText.trim(),
+                            completed: false,
+                            dueDate: newTaskDate,
+                            type: "manual" as const,
+                          };
+                          addTask(t);
+                          setTasks(loadTasks().filter((x) => x.contactId === id));
+                          setAddingTask(false);
+                          setNewTaskText("");
+                          setNewTaskDate(new Date(Date.now() + 3 * 86400_000).toISOString().split("T")[0]);
+                        }}
+                        style={{
+                          height: 42,
+                          padding: "0 16px",
+                          borderRadius: 12,
+                          background: "var(--signal)",
+                          color: "var(--abyss)",
+                          border: "none",
+                          fontFamily: "var(--sans)",
+                          fontWeight: 600,
+                          fontSize: 13,
+                          cursor: "pointer",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        Добавить
+                      </button>
+                      <button
+                        onClick={() => setAddingTask(false)}
+                        style={{
+                          height: 42,
+                          width: 42,
+                          flexShrink: 0,
+                          borderRadius: 12,
+                          background: "transparent",
+                          border: "1px solid var(--line-soft)",
+                          color: "var(--muted-fg)",
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
 
@@ -736,60 +1078,93 @@ export function ContactDetail() {
         {!contact.followUpSent && contact.user.username && (
           <div style={{ padding: "24px 16px 0" }}>
             <div style={cardStyle}>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  marginBottom: 8,
-                }}
-              >
-                <AISparkle size={11} color="var(--amber)" />
-                <span className="eyebrow" style={{ color: "var(--amber)" }}>
-                  AI · ЧЕРНОВИК СООБЩЕНИЯ
-                </span>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <AISparkle size={11} color="var(--amber)" />
+                  <span className="eyebrow" style={{ color: "var(--amber)" }}>
+                    AI · ЧЕРНОВИК СООБЩЕНИЯ
+                  </span>
+                </div>
+                <button
+                  onClick={generateAiDraft}
+                  disabled={aiDraftLoading}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 5,
+                    padding: "4px 10px",
+                    borderRadius: 20,
+                    border: "1px solid var(--amber)",
+                    background: "transparent",
+                    color: "var(--amber)",
+                    fontFamily: "var(--mono)",
+                    fontSize: 10,
+                    letterSpacing: "0.06em",
+                    cursor: aiDraftLoading ? "default" : "pointer",
+                    opacity: aiDraftLoading ? 0.6 : 1,
+                  }}
+                >
+                  {aiDraftLoading ? (
+                    <>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ animation: "spin 1s linear infinite" }}>
+                        <path d="M21 12a9 9 0 11-6.219-8.56"/>
+                      </svg>
+                      ГЕНЕРИРУЮ
+                    </>
+                  ) : (
+                    <>
+                      <AISparkle size={9} color="var(--amber)" />
+                      {aiDraftText ? "ПЕРЕГЕНЕРИРОВАТЬ" : "СГЕНЕРИРОВАТЬ"}
+                    </>
+                  )}
+                </button>
               </div>
-              <p
-                className="font-serif"
-                style={{
-                  fontSize: 14.5,
-                  margin: "0 0 14px",
-                  lineHeight: 1.55,
-                  whiteSpace: "pre-line",
-                  color: "var(--warm)",
-                }}
-              >
-                {(() => {
-                  const firstName = contact.user.name.split(" ")[0];
-                  const myIntro = [
-                    currentUser.name,
-                    currentUser.role,
-                    currentUser.company,
-                  ]
-                    .filter(Boolean)
-                    .join(", ");
-                  const lines = [`Привет ${firstName}!`, "", `Я ${myIntro}.`];
-                  if (contact.event)
-                    lines.push(
-                      `Было приятно познакомиться на ${contact.event}!`
-                    );
-                  if (contact.aiSummary)
-                    lines.push(
-                      `\nПомню, ты ${contact.aiSummary.toLowerCase()}.`
-                    );
-                  if (currentUser.bio) lines.push(`\n${currentUser.bio}`);
-                  lines.push("\nДавай продолжим общение!");
-                  return lines.join("\n");
-                })()}
-              </p>
+
+              {aiDraftText ? (
+                <textarea
+                  value={aiDraftText}
+                  onChange={(e) => setAiDraftText(e.target.value)}
+                  rows={6}
+                  style={{
+                    width: "100%",
+                    background: "var(--textarea-tinted-bg)",
+                    border: "1px solid var(--textarea-tinted-border)",
+                    borderRadius: 10,
+                    padding: "12px 14px",
+                    color: "var(--warm)",
+                    fontFamily: "var(--sans)",
+                    fontSize: 14.5,
+                    lineHeight: 1.55,
+                    resize: "none",
+                    outline: "none",
+                    boxSizing: "border-box",
+                    marginBottom: 12,
+                  }}
+                />
+              ) : (
+                <p
+                  style={{
+                    fontSize: 13,
+                    color: "var(--muted-fg)",
+                    fontFamily: "var(--sans)",
+                    lineHeight: 1.5,
+                    margin: "0 0 14px",
+                    fontStyle: "italic",
+                  }}
+                >
+                  AI напишет персонализированное сообщение на основе заметок и контекста встречи
+                </p>
+              )}
+
               <button
                 onClick={handleSendFollowUp}
+                disabled={!aiDraftText}
                 style={{
                   width: "100%",
                   height: 46,
                   borderRadius: 14,
-                  background: "var(--signal)",
-                  color: "var(--abyss)",
+                  background: aiDraftText ? "var(--signal)" : "var(--deep)",
+                  color: aiDraftText ? "var(--abyss)" : "var(--muted-fg)",
                   border: "none",
                   fontFamily: "var(--sans)",
                   fontSize: 14,
@@ -798,8 +1173,9 @@ export function ContactDetail() {
                   alignItems: "center",
                   justifyContent: "center",
                   gap: 8,
-                  cursor: "pointer",
-                  boxShadow: "0 4px 20px oklch(0.86 0.13 195 / 0.25)",
+                  cursor: aiDraftText ? "pointer" : "default",
+                  boxShadow: aiDraftText ? "0 4px 20px oklch(0.86 0.13 195 / 0.25)" : "none",
+                  transition: "background 0.2s, color 0.2s",
                 }}
               >
                 <Send className="w-4 h-4" />

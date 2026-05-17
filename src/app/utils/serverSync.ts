@@ -1,7 +1,9 @@
 /**
- * Mirrors tasks to the backend so the cron job can push bot reminders.
+ * Mirrors tasks + contacts (observer-layer) to the backend.
  * Best-effort: never throws, silently no-ops if outside Telegram.
  */
+import type { Connection } from "./mockData";
+
 function getInitData(): string | null {
   try {
     const tg = (window as any).Telegram?.WebApp;
@@ -51,14 +53,60 @@ export interface ServerTask {
   completed?: boolean;
 }
 
-export async function pushTask(task: ServerTask): Promise<void> {
-  await apiCall("/api/tasks", { method: "POST", body: task });
+export async function pushTask(task: ServerTask): Promise<{ ok: boolean }> {
+  const r = await apiCall("/api/tasks", { method: "POST", body: task });
+  return { ok: r.ok };
 }
 
-export async function patchTask(id: string, patch: { completed?: boolean }): Promise<void> {
-  await apiCall(`/api/tasks/${encodeURIComponent(id)}`, { method: "PATCH", body: patch });
+export async function patchTask(id: string, patch: { completed?: boolean }): Promise<{ ok: boolean }> {
+  const r = await apiCall(`/api/tasks?id=${encodeURIComponent(id)}`, { method: "PATCH", body: patch });
+  return { ok: r.ok };
 }
 
-export async function deleteTask(id: string): Promise<void> {
-  await apiCall(`/api/tasks/${encodeURIComponent(id)}`, { method: "DELETE" });
+export async function deleteTask(id: string): Promise<{ ok: boolean }> {
+  const r = await apiCall(`/api/tasks?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+  return { ok: r.ok };
+}
+
+export async function pullTasks(): Promise<ServerTask[]> {
+  const r = await apiCall("/api/tasks", { method: "GET" });
+  if (!r.ok || !r.data) return [];
+  return Array.isArray(r.data.tasks) ? r.data.tasks : [];
+}
+
+// ─── Contacts (observer-layer) ──────────────────────────────────────────────
+
+export interface ContactsSyncResult {
+  ok: boolean;
+  items: (Connection & { deleted?: boolean })[];
+  now: number;
+}
+
+/** Push a single contact upsert. Body is the full Connection. Returns ok flag for outbox. */
+export async function pushContact(c: Connection): Promise<{ ok: boolean }> {
+  const r = await apiCall("/api/contacts", { method: "POST", body: c });
+  return { ok: r.ok };
+}
+
+/** Partial update — merges server-side. */
+export async function patchContact(id: string, patch: Partial<Connection>): Promise<{ ok: boolean }> {
+  const r = await apiCall(`/api/contacts?id=${encodeURIComponent(id)}`, { method: "PATCH", body: patch });
+  return { ok: r.ok };
+}
+
+/** Server-side tombstone so other devices remove it next sync. */
+export async function deleteContact(id: string): Promise<{ ok: boolean }> {
+  const r = await apiCall(`/api/contacts?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+  return { ok: r.ok };
+}
+
+/** Pull contacts updated after `since` (ms). Returns items (incl. tombstones) and a new cursor. */
+export async function pullContacts(since: number): Promise<ContactsSyncResult> {
+  const r = await apiCall(`/api/contacts?since=${since}`, { method: "GET" });
+  if (!r.ok || !r.data) return { ok: false, items: [], now: since };
+  return {
+    ok: true,
+    items: Array.isArray(r.data.items) ? r.data.items : [],
+    now: typeof r.data.now === "number" ? r.data.now : Date.now(),
+  };
 }

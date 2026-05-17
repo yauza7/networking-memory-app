@@ -11,6 +11,14 @@ export interface User {
   bio?: string;
 }
 
+export interface SharedFrom {
+  fromUsername: string;
+  fromName: string;
+  sharedTags: string[];
+  sharedNote: string;
+  sharedAt: string;
+}
+
 export interface Connection {
   id: string;
   user: User;
@@ -21,6 +29,7 @@ export interface Connection {
   lastContact?: string;
   followUpSent?: boolean;
   followUpSentAt?: string;
+  sharedFrom?: SharedFrom[];
 }
 
 export const currentUser: User = {
