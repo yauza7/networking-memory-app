@@ -92,6 +92,59 @@ bunx vercel --prod   # Деплой на Vercel
 
 ---
 
+## API и сервисы
+
+### 🤖 Groq API — основной AI-провайдер
+- **Для чего:** AI сводки заметок (`llama-3.3-70b-versatile`), черновики follow-up сообщений, транскрипция голосовых (`whisper-large-v3-turbo`)
+- **Переменная:** `GROQ_API_KEY`
+- **Где хранится:** Vercel Dashboard → Settings → Environment Variables
+- **Консоль:** https://console.groq.com
+- **Используется в:** `api/anthropic/v1/messages.ts` (основной провайдер), `api/transcribe.ts`, `api/webhook.ts`
+
+### 🧠 Anthropic API — AI fallback
+- **Для чего:** Claude claude-3-5-haiku — резервный провайдер если Groq недоступен (черновики сообщений, сводки)
+- **Переменная:** `ANTHROPIC_API_KEY`
+- **Где хранится:** Vercel Dashboard → Settings → Environment Variables
+- **Консоль:** https://console.anthropic.com
+- **Используется в:** `api/anthropic/v1/messages.ts` (пробуется первым, при 402/529 переключается на Groq)
+
+### 🗄️ Redis — база данных
+- **Для чего:** хранение контактов, задач, профилей, голосовых расшифровок, share-токенов, регистраций пользователей
+- **Переменная:** `REDIS_URL` (формат: `redis://default:<password>@<host>:<port>`)
+- **Где хранится:** Vercel Dashboard → Settings → Environment Variables
+- **Провайдер:** любой Redis-совместимый (рекомендуется Upstash или Railway Redis)
+- **Используется в:** почти все `api/*.ts` файлы через `api/_lib/redis.ts`
+
+### 🤗 HuggingFace — запасной Whisper
+- **Для чего:** транскрипция голосовых сообщений (`whisper-large-v2`) — запасной вариант если Groq недоступен
+- **Переменная:** `HUGGINGFACE_TOKEN`
+- **Где хранится:** Vercel Dashboard → Settings → Environment Variables
+- **Консоль:** https://huggingface.co/settings/tokens
+- **Используется в:** `api/transcribe.ts`, `api/webhook.ts` (только если Groq не отвечает)
+
+### 🤖 Telegram Bot API
+- **Для чего:** бот @w52_echo_bot — webhook, отправка сообщений, голосовые, inline-query, крон-напоминания
+- **Переменная токена:** `TELEGRAM_BOT_TOKEN`
+- **Переменная webhook-секрета:** `TELEGRAM_WEBHOOK_SECRET`
+- **Где хранится:** Vercel Dashboard → Settings → Environment Variables
+- **Получить токен:** @BotFather → /newbot
+- **Webhook URL:** `https://w52-app.vercel.app/api/webhook`
+- **Используется в:** `api/webhook.ts`, `api/cron-reminders.ts`
+
+### 🚀 Vercel — хостинг и деплой
+- **Для чего:** хостинг фронта (Vite/React) + serverless functions (`api/`) + cron jobs
+- **Деплой:** `bunx vercel --prod` из папки проекта
+- **Dashboard:** https://vercel.com/surevshare-9022s-projects
+- **Cron:** `/api/cron-reminders` запускается каждый день в 9:00 UTC (настройка в `vercel.json`)
+- **Переменная:** `CRON_SECRET` (автоматически ставит Vercel для защиты cron-эндпоинта)
+
+### 📦 GitHub — репозиторий
+- **URL:** https://github.com/yauza7/networking-memory-app
+- **Ветка:** `main`
+- **Деплой:** вручную через `bunx vercel --prod` (автодеплой с GitHub не настроен)
+
+---
+
 ## Известные баги
 
 1. **Шаринг профиля открывается в браузере** — `t.me/share/url?url=...` открывает сайт в браузере, не как Mini App. Нужно либо убрать текстовую ссылку полностью, либо сделать deep link через бот.
