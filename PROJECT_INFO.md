@@ -1,7 +1,7 @@
-# W·52 — Networking Memory App
+# Echo — Networking Memory App
 
 > Telegram Mini App для нетворкинга на конференциях.  
-> 52 недели в году — поддерживай связи весь год.
+> *Every signal finds its receiver.*
 
 ---
 
@@ -14,6 +14,24 @@
 | Открыть мини-апп в Telegram | https://t.me/Whale52hz_bot/w52 |
 | GitHub репозиторий | https://github.com/yauza7/networking-memory-app |
 | Vercel dashboard | https://vercel.com/surevshare-9022s-projects/w52-app |
+| Политика конфиденциальности | https://w52-app.vercel.app/privacy.html |
+| Условия использования | https://w52-app.vercel.app/terms.html |
+
+---
+
+## Бренд
+
+- **Название:** Echo
+- **Слоган:** Every signal finds its receiver.
+- **Допустимые визуальные тексты:** 52 HZ, Whale, WHALE · 52 HZ
+- **Легенда:** Где-то в океане плавает кит, который поёт на 52 Hz — частоте, которую не слышит никто из его сородичей.
+- **Цветовая палитра (oklch):**
+  - `--abyss`: oklch(0.130 0.025 240) — самый тёмный фон
+  - `--bg`: oklch(0.155 0.025 240) — основной фон
+  - `--signal`: oklch(0.86 0.130 195) — биолюминесцентный cyan (акцент)
+  - `--ivory`: oklch(0.965 0.012 80) — текст
+- **Типографика:** Instrument Serif (hero/логотип) · Instrument Sans (UI) · JetBrains Mono (метаданные, eyebrow)
+- **Логотип:** `Echo.` — Instrument Serif, точка цвета `--signal`
 
 ---
 
@@ -42,58 +60,67 @@
 
 ```
 /
-├── index.html                  # Точка входа HTML, viewport meta, Telegram WebApp SDK
+├── index.html                  # Точка входа, viewport meta, Telegram WebApp SDK
+│                               # Title: "Echo — Every signal finds its receiver."
 ├── vite.config.ts              # Конфиг Vite
-├── vercel.json                 # Vercel: rewrites, crons, функции maxDuration
-├── package.json                # Зависимости
+├── vercel.json                 # Vercel: rewrites, crons, maxDuration
+├── package.json
 ├── .env                        # ⛔ НЕ в Git — реальные ключи
-├── .env.example                # ✅ В Git — шаблон без значений
-├── .gitignore
+├── .env.example                # ✅ В Git — шаблон
 │
 ├── src/
 │   ├── main.tsx                # React root, монтирование #root
-│   ├── styles/                 # Глобальные CSS (Tailwind, glass-card, ios-tag)
+│   ├── styles/                 # Глобальные CSS (Tailwind, glass-card, ios-tag, oklch переменные)
 │   └── app/
-│       ├── App.tsx             # Роутер, сплэш, Setup-гейт, Telegram WebApp init
+│       ├── App.tsx             # Роутер, сплэш-гейт, Setup-гейт, Tour-гейт
+│       │                       # Порядок: Splash → Setup → Tour → App
 │       ├── components/
-│       │   ├── Navigation.tsx  # Нижняя навигация (скрыта на фокусных экранах)
-│       │   ├── ErrorBoundary.tsx # Глобальный обработчик ошибок React
-│       │   ├── VisualCard.tsx  # Компонент визуальной карточки контакта
-│       │   └── ui/             # Shadcn/Radix UI компоненты (не используются активно)
+│       │   ├── Navigation.tsx      # Нижняя навигация (скрыта на /tour, /u/, /setup)
+│       │   ├── ErrorBoundary.tsx   # Глобальный обработчик ошибок React
+│       │   ├── WelcomeBanner.tsx   # Баннер «Echo Demo» (фиксированный, закрываемый)
+│       │   ├── VisualCard.tsx      # Визуальная карточка контакта
+│       │   └── brand/
+│       │       └── Brand.tsx       # Дизайн-система: Atmosphere, Hero, Chip, Avatar,
+│       │                           # SignalBtn, IvoryBtn, GhostBtn, RoundBtn, Sonar,
+│       │                           # W52Mark, W52Wordmark, AISparkle, cardStyle
 │       │
-│       ├── screens/            # Все экраны приложения
-│       │   ├── SplashScreen.tsx    # Заставка при первом открытии сессии
-│       │   ├── Setup.tsx           # Регистрация (имя, должность, username, фото)
+│       ├── screens/
+│       │   ├── SplashScreen.tsx    # Заставка (сессионная, не показывается повторно)
+│       │   │                       # Eyebrow: WHALE · 52 HZ
+│       │   ├── Setup.tsx           # Регистрация: имя, должность, компания, username,
+│       │   │                       # сайт, bio, теги (шаг 1 + шаг 2)
+│       │   │                       # CoordLine: ECHO · IDENTITY
+│       │   ├── Tour.tsx            # 8-слайдовый онбординг после Setup
+│       │   │                       # localStorage key: w52_tour_completed
+│       │   │                       # CoordLine: ECHO · TOUR
 │       │   ├── Dashboard.tsx       # Главный экран — статистика, follow-up задачи
-│       │   ├── Scanner.tsx         # QR-сканер (Telegram native + BarcodeDetector)
+│       │   ├── Scanner.tsx         # QR-сканер (Telegram native + BarcodeDetector API)
 │       │   ├── AddContact.tsx      # Форма добавления контакта (QR/ручной ввод)
-│       │   │                       # → тег-пикер, событие, заметка
-│       │   ├── AddNote.tsx         # Экран заметки после добавления контакта
-│       │   │                       # → MediaRecorder + авто-транскрипция + AI summary
-│       │   ├── VoiceNote.tsx       # Просмотр/редактирование расшифровки из бота
-│       │   │                       # → прикрепление к контакту
-│       │   ├── Contacts.tsx        # Список контактов, фильтры, поиск, CSV→бот
-│       │   ├── ContactDetail.tsx   # Карточка контакта, задачи, заметки, follow-up
-│       │   ├── PublicProfile.tsx   # Публичная страница /u/:username (без авторизации)
+│       │   │                       # → тег-пикер, событие, заметка, username
+│       │   ├── AddNote.tsx         # Заметка после добавления контакта
+│       │   │                       # → MediaRecorder + Whisper transcription + Claude AI summary
+│       │   ├── VoiceNote.tsx       # Просмотр расшифровки из бота → прикрепление к контакту
+│       │   ├── Contacts.tsx        # Список контактов, фильтры по тегам, поиск, CSV экспорт
+│       │   ├── ContactDetail.tsx   # Карточка контакта: заметка, задачи, теги, follow-up
+│       │   │                       # Inline тег-пикер с группами: Команда / Трафик / Вертикали
+│       │   ├── PublicProfile.tsx   # Публичная страница /u/:username
+│       │   │                       # Декодирует d= параметр (base64 JSON) → User object
 │       │   ├── MyCard.tsx          # Моя визитка + QR-код
 │       │   ├── ShareProfile.tsx    # Поделиться профилем
 │       │   ├── EditProfile.tsx     # Редактирование профиля
 │       │   ├── Notifications.tsx   # Список уведомлений
 │       │   ├── Tasks.tsx           # Все задачи / follow-up
-│       │   ├── Settings.tsx        # Настройки, экспорт, О приложении, удаление данных
-│       │   └── Onboarding.tsx      # Онбординг (tips)
+│       │   └── Settings.tsx        # Настройки, экспорт, «Пройти тур заново», О Echo
 │       │
 │       └── utils/
 │           ├── userStore.ts        # loadCurrentUser, saveCurrentUser, getQRValue
-│           │                       # → Telegram initData + localStorage w52_profile
-│           ├── contactStore.ts     # CRUD контактов в localStorage w52_contacts
-│           │                       # → addStoredContact, removeStoredContact, updateStoredContact
-│           ├── taskStore.ts        # CRUD задач + синхронизация с сервером
-│           ├── notificationStore.ts# Уведомления в localStorage
+│           ├── contactStore.ts     # CRUD контактов в localStorage (w52_contacts)
+│           ├── taskStore.ts        # CRUD задач + Redis sync
+│           ├── notificationStore.ts
 │           ├── serverSync.ts       # ensureRegistered, pushTask, patchTask, deleteTask
-│           │                       # → best-effort POST к API (не блокирует UI)
-│           ├── mockData.ts         # Типы Connection, User; mockContacts = [] (пусто)
-│           └── telegramBot.ts      # Утилиты бота (не используется на клиенте)
+│           ├── mockData.ts         # Типы Connection, User; mockContacts = []
+│           ├── suggestedContacts.ts # 17 curated iGaming/affiliate контактов для онбординга
+│           └── themeStore.ts       # Управление темой (если используется)
 │
 ├── api/                        # Vercel Serverless Functions (Node.js)
 │   ├── _lib/
@@ -101,207 +128,203 @@
 │   │   └── redis.ts            # Redis-клиент singleton (ioredis TCP)
 │   │
 │   ├── webhook.ts              # POST /api/webhook — Telegram Bot
-│   │                           # Команды: /start /help /share /add /scan /contacts /tasks /profile
+│   │                           # Команды: /start /help /share /add /note /scan
+│   │                           #          /contacts /tasks /me /export /about
+│   │                           #          /privacy /terms + алиасы
+│   │                           # Смарт-матчинг свободного текста (политика, визитка, etc.)
 │   │                           # Голосовые: Whisper → Redis → ссылка на /voice-note
 │   │                           # Текст → черновик заметки в Redis
 │   │
-│   ├── register.ts             # POST /api/register — регистрация chat_id для cron
-│   ├── tasks.ts                # GET/POST /api/tasks — список и создание задач
+│   ├── setup-bot.ts            # GET /api/setup-bot?secret= — одноразовая настройка бота:
+│   │                           # setMyName, setMyDescription, setMyShortDescription,
+│   │                           # setMyCommands, setChatMenuButton
+│   ├── register.ts             # POST /api/register — регистрация chat_id
+│   ├── tasks.ts                # GET/POST /api/tasks
 │   ├── tasks/[id].ts           # PATCH/DELETE /api/tasks/:id
 │   ├── cron-reminders.ts       # GET /api/cron-reminders — ежедневный cron 09:00 UTC
-│   │                           # → достаёт просроченные задачи из Redis ZSET, шлёт в бот
-│   ├── user-photo.ts           # GET /api/user-photo?user_id= — прокси фото из Telegram
-│   ├── voice/[id].ts           # GET /api/voice/:id — получить расшифровку из Redis
-│   ├── transcribe.ts           # POST /api/transcribe — аудио → Whisper → текст
-│   │                           # Используется AddNote.tsx для записи из мини-апп
-│   ├── send-csv.ts             # POST /api/send-csv — отправить CSV файл в Telegram-чат
+│   ├── user-photo.ts           # GET /api/user-photo?user_id= — прокси фото Telegram
+│   ├── voice/[id].ts           # GET /api/voice/:id — расшифровка из Redis
+│   ├── transcribe.ts           # POST /api/transcribe — аудио → HuggingFace Whisper → текст
+│   ├── send-csv.ts             # POST /api/send-csv — CSV файл в Telegram-чат
 │   └── anthropic/
 │       └── v1/messages.ts      # POST /api/anthropic/v1/messages — прокси Claude API
 │
 └── public/
-    ├── privacy.html            # Политика конфиденциальности
-    └── terms.html              # Условия использования
+    ├── privacy.html            # Политика конфиденциальности (Echo-брендинг, oklch)
+    └── terms.html              # Условия использования (Echo-брендинг, oklch)
 ```
 
 ---
 
-## API ключи — где хранятся
+## Теги (TAG_GROUPS)
 
-> ⚠️ Реальные значения ключей **нигде в коде не хранятся**.  
-> Шаблон — `.env.example`. Реальный файл — `.env` (не в Git).
+Используются в ContactDetail, AddContact, EditProfile, Contacts — синхронизированы:
 
-| Переменная | Где взять | Где хранится |
-|------------|-----------|--------------|
-| `TELEGRAM_BOT_TOKEN` | @BotFather → `/newbot` | Vercel ENV + локально в `.env` |
-| `TELEGRAM_WEBHOOK_SECRET` | Любая случайная строка | Vercel ENV + `.env` |
-| `ANTHROPIC_API_KEY` | console.anthropic.com | Vercel ENV + `.env` |
-| `HUGGINGFACE_TOKEN` | huggingface.co/settings/tokens | Vercel ENV + `.env` |
-| `REDIS_URL` | Redis Labs / Upstash / любой TCP Redis | Vercel ENV + `.env` |
-| `APP_URL` | `https://w52-app.vercel.app` | Vercel ENV + `.env` |
-| `CRON_SECRET` | Автоматически Vercel | Vercel ENV |
+| Группа | Теги |
+|--------|------|
+| Команда | Buying, Платёжки, Разработка, Партнёрская сеть, Прилы, Аккаунты, Трекеры, HR, PR, Дизайн, Конференции |
+| Трафик | FB, UAC, PPC, SEO, ASO, TikTok Ads, Influence, Схемы, Email, SMS, УБТ |
+| Вертикали | Нутра, Gambling, Betting, Adult, Финансы, Crypto |
 
-**Добавить/изменить ключ в Vercel:**
-```bash
-vercel env add КЛЮЧ production
-# или через dashboard: vercel.com → Project → Settings → Environment Variables
-```
+---
+
+## API ключи
+
+> ⚠️ Реальные значения — только в Vercel ENV и локальном `.env` (не в Git).
+
+| Переменная | Где взять |
+|------------|-----------|
+| `TELEGRAM_BOT_TOKEN` | @BotFather → `/newbot` |
+| `TELEGRAM_WEBHOOK_SECRET` | Любая случайная строка |
+| `ANTHROPIC_API_KEY` | console.anthropic.com |
+| `HUGGINGFACE_TOKEN` | huggingface.co/settings/tokens |
+| `REDIS_URL` | Upstash / Redis Labs (TCP) |
+| `APP_URL` | https://w52-app.vercel.app |
+| `CRON_SECRET` | Автоматически Vercel |
 
 ---
 
 ## Redis — схема ключей
 
 ```
-user:<tg_id>                    # hash — профиль пользователя (chat_id, username, name)
-task:<tg_id>:<task_id>          # hash — задача
-tasks_due                       # sorted set — задачи по дедлайну (score = unix timestamp)
-voice:<chat_id>:<file_unique_id># string с TTL 24ч — расшифрованный текст голосовой заметки
+user:<tg_id>                      # hash — профиль (chat_id, username, name, registered_at)
+task:<tg_id>:<task_id>            # hash — задача
+tasks_due                         # sorted set — дедлайны (score = unix timestamp)
+voice:<chat_id>:<file_unique_id>  # string TTL 24ч — расшифровка голосовой заметки
 ```
 
 ---
 
-## Что уже сделано
+## Telegram Bot — команды
 
-### Основной функционал
-- [x] Telegram Mini App (открывается через бота)
-- [x] Регистрация/онбординг (Setup экран)
-- [x] Сплэш-экран при первом открытии сессии
-- [x] QR-визитка — генерация с полным профилем в `d=` параметре
-- [x] QR-сканер — Telegram native + BarcodeDetector API
-- [x] Добавление контакта через QR → AddContact → AddNote
-- [x] Ручное добавление контакта (без QR)
-- [x] Тег-пикер при добавлении контакта
-- [x] Голосовая заметка через мини-апп (MediaRecorder + авто-транскрипция Whisper)
-- [x] Текстовая заметка с AI summary (Claude Sonnet)
-- [x] AI создаёт summary, теги и срок follow-up из заметки
-- [x] Graceful AI failure — заметка сохраняется даже без AI
-- [x] Список контактов с фильтрами (категория, событие, поиск)
-- [x] Карточка контакта (фото, заметка, задачи, follow-up)
-- [x] Удаление контакта
-- [x] Поделиться контактом (через Telegram share)
-- [x] Умное follow-up сообщение (адаптируется к незаполненным полям)
-- [x] Поделиться своей визиткой из карточки контакта
-- [x] Публичный профиль `/u/:username` — работает без регистрации
-- [x] Задачи / follow-up напоминания (localStorage + Redis sync)
-- [x] Уведомления
-- [x] Экспорт контактов в CSV → файл в Telegram-чат (с учётом активного фильтра)
-- [x] Настройки: редактирование профиля, сброс данных, О приложении
+| Команда | Что делает |
+|---------|------------|
+| `/start` | Приветствие с легендой кита 52 Hz |
+| `/help` | Что умею + список команд |
+| `/share` | Ссылка на свою визитку |
+| `/add @user заметка` | Записать контакт прямо в чате (работает офлайн) |
+| `/note @user текст` | Добавить заметку к контакту |
+| `/scan` | Открыть QR-сканер в приложении |
+| `/contacts` | Открыть список контактов |
+| `/tasks` | Открыть задачи |
+| `/me` (+ `/profile`, `/card`) | Моя визитка |
+| `/export` (+ `/csv`) | Выгрузка CSV |
+| `/about` (+ `/info`) | О Echo |
+| `/privacy` (+ `/policy`) | Политика конфиденциальности |
+| `/terms` (+ `/tos`) | Условия использования |
+| Голосовое сообщение | Whisper → расшифровка → «Сохранить к контакту» |
+| Пересланное сообщение / текст | Черновик заметки → «Прикрепить к контакту» |
+| Свободный текст (1–3 слова) | Смарт-матчинг: «политика», «контакты», «задачи» и т.д. |
 
-### Telegram Bot (@Whale52hz_bot)
-- [x] `/start` — приветствие с меню
-- [x] `/help` — список команд
-- [x] `/share` — короткая ссылка на визитку
-- [x] `/add @username заметка` — быстро записать контакт через бота
-- [x] `/scan` — открыть QR-сканер
-- [x] `/contacts`, `/tasks`, `/profile` — навигация
-- [x] Голосовые сообщения → Whisper → расшифровка → ссылка «Сохранить к контакту»
-- [x] Текстовые сообщения → черновик заметки в Redis → кнопка «Прикрепить к контакту»
-- [x] Inline-режим (@bot в любом чате) — поделиться визиткой
-- [x] Ежедневный cron (09:00 UTC) — напоминания о просроченных задачах
+Кнопки в /start:
+```
+[ Открыть приложение ]   ← единственная, ведущая в mini app
+[ Как это работает? ] [ Команды ]  ← callback внутри бота
+```
 
-### Инфраструктура
-- [x] Vercel production deploy (https://w52-app.vercel.app)
-- [x] Redis TCP (ioredis, singleton)
-- [x] HMAC-SHA256 верификация Telegram initData на всех API
-- [x] Прокси фото из Telegram (`/api/user-photo`)
-- [x] Прокси Claude API (`/api/anthropic/v1/messages`)
-- [x] Privacy Policy + Terms of Use (HTML-страницы)
+Кнопка «← Назад» есть в «Как это работает?» и «Команды».
 
 ---
 
-## Что ещё не доделано / известные баги
+## Что сделано
+
+### Приложение
+- [x] Telegram Mini App (открывается через бота и прямую ссылку)
+- [x] Сплэш-экран (сессионный)
+- [x] Регистрация (Setup, 2 шага: личные данные + профессиональные)
+- [x] 8-слайдовый онбординг (Tour) после регистрации, повтор из Settings
+- [x] QR-визитка — base64 JSON в `d=` параметре (работает офлайн)
+- [x] QR-сканер — Telegram native + BarcodeDetector API
+- [x] Добавление контакта по QR, по @username, вручную
+- [x] Тег-пикер с группами Команда / Трафик / Вертикали
+- [x] Голосовая заметка (MediaRecorder + Whisper + Claude AI summary)
+- [x] Текстовая заметка с Claude AI summary, тегами, сроком follow-up
+- [x] Список контактов с фильтрами и поиском
+- [x] Карточка контакта (заметка, задачи, follow-up, поделиться)
+- [x] Задачи / follow-up (localStorage + Redis sync)
+- [x] Публичный профиль `/u/:username` — без авторизации
+- [x] Экспорт CSV → файл в Telegram-чат
+- [x] Настройки: редактирование профиля, сброс данных, повтор тура
+- [x] Echo-брендинг: oklch палитра, Instrument Serif, JetBrains Mono
+- [x] WelcomeBanner «Echo Demo» с E. логотипом
+
+### Telegram Bot
+- [x] Легенда кита 52 Hz в /start
+- [x] Все команды (10 основных + алиасы)
+- [x] Смарт-матчинг свободного текста
+- [x] Голосовые сообщения → Whisper → расшифровка
+- [x] Черновики заметок из текста (Redis 24ч)
+- [x] Inline-режим — поделиться визиткой в любом чате
+- [x] Кнопка «← Назад» в подменю
+- [x] Ежедневный cron — напоминания о просроченных задачах
+- [x] Persistent menu button «Открыть Echo» (setChatMenuButton)
+- [x] Политика конфиденциальности и Условия — кнопки в /about
+
+### Инфраструктура
+- [x] Vercel production (w52-app.vercel.app)
+- [x] Redis TCP (Upstash, ioredis singleton)
+- [x] HMAC-SHA256 верификация initData на всех API
+- [x] Прокси Telegram CDN фото (`/api/user-photo`)
+- [x] Прокси Claude API (`/api/anthropic/v1/messages`)
+- [x] /api/setup-bot — программное обновление имени/описания/команд бота
+- [x] Privacy + Terms HTML (Echo-брендинг)
+
+---
+
+## Известные проблемы / TODO
+
+### Приоритетные
+- [ ] **Имя из username** — при добавлении по @username поле «Имя» заполняется username, а не именем из Telegram
+- [ ] **Онбординг дважды** — Tour запускается повторно в некоторых сценариях
+- [ ] **Публичный профиль** — при открытии `/u/username` без `d=` параметра пишет «нет в Echo» даже если пользователь есть
+- [ ] **Старый UI PublicProfile** — стили не обновлены под Echo-брендинг
 
 ### Средний приоритет
-- [ ] **Воспроизведение записанного аудио** — после записи в AddNote нет кнопки Play
-- [ ] **Фото при регистрации** — Setup экран не предлагает загрузить фото вручную (только из Telegram)
-- [ ] **Поиск по заметкам** — в списке контактов поиск не ищет по тексту заметок
-- [ ] **Редактирование заметки** — в ContactDetail нет inline-редактирования, только добавление новых
-- [ ] **Импорт контактов** — нет возможности импортировать CSV обратно
-- [ ] **Публичный профиль без d=** — если кто-то шарит `/u/username` без QR-данных, профиль пустой (показывает «добавить по username»)
-
-### Мелкие баги
-- [ ] **Дата follow-up** — хранится как строка в `followUpDate`, но в UI не отображается явно на Dashboard
-- [ ] **Дубли задач** — при переоткрытии AddContact создаётся новая задача «Написать X», если контакт уже есть
-- [ ] **Offline-режим** — нет явного сообщения об ошибке если нет сети при транскрипции
-- [ ] **Длинные имена** — в Navigation и некоторых карточках длинные имена не обрезаются через ellipsis
-
-### Нереализовано (задумано, но не сделано)
-- [ ] **Поиск по Telegram username** в базе W52 (пока только локальный поиск)
-- [ ] **Push-уведомления** через Telegram bot (cron есть, но уведомления только в чате бота)
-- [ ] **Аналитика** — нет дашборда «сколько встреч на какой конференции»
+- [ ] **Засечки в мелких текстах** — часть мелкого UI-текста использует serif, нужен sans
+- [ ] **Тег «TG» в Tasks** — кнопка-открывашка Telegram у задач, пользователи принимают за тег
+- [ ] **НИШИ в Setup** — лейбл «НИШИ» и теги не синхронизированы с TAG_GROUPS
+- [ ] **Воспроизведение аудио** — после записи в AddNote нет кнопки Play
+- [ ] **Поиск по заметкам** — в Contacts поиск не ищет по тексту заметок
+- [ ] **Дубли задач** — при повторном открытии AddContact создаётся ещё одна задача «Написать X»
 
 ---
 
 ## Как запустить локально
 
-### 1. Клонировать репозиторий
 ```bash
 git clone https://github.com/yauza7/networking-memory-app.git
 cd networking-memory-app
-```
-
-### 2. Установить зависимости
-```bash
-# Bun (рекомендуется — используется на проекте)
 bun install
-
-# или npm
-npm install
-```
-
-### 3. Создать .env
-```bash
 cp .env.example .env
-# Заполни реальные значения в .env
-```
-
-Минимум для запуска фронтенда без бота:
-```
-APP_URL=http://localhost:5173
-```
-
-### 4. Запустить dev-сервер
-```bash
+# Заполни .env
 bun run dev
-# или
-npm run dev
+# → http://localhost:5173
 ```
 
-Открыть: http://localhost:5173
-
-> **Важно:** Telegram-функции (initData, фото, бот) работают только внутри Telegram.  
-> При локальном открытии в браузере — приложение работает без авторизации,  
-> фото и push-функции недоступны.
-
-### 5. Запустить API локально (опционально)
+Для API функций:
 ```bash
-# Vercel CLI нужен для локального запуска serverless функций
-vercel dev
+~/.bun/bin/vercel dev
 ```
+
+> Telegram-функции (initData, фото, бот) работают только внутри Telegram.  
+> Локально — приложение работает без авторизации, все данные в localStorage.
 
 ---
 
-## Как задеплоить
+## Деплой
 
-### Автодеплой через Git
-Vercel настроен на автодеплой из ветки `main`:
 ```bash
-git add .
-git commit -m "описание изменений"
+# Автодеплой через git push main (Vercel настроен на ветку main)
 git push origin main
-# Vercel задеплоит автоматически через ~30 сек
-```
 
-### Ручной деплой
-```bash
+# Ручной деплой
 ~/.bun/bin/vercel --prod
-# или если vercel в PATH:
-vercel --prod
-```
 
-### После деплоя — переустановить webhook бота
-Если изменился домен (обычно не нужно — домен `w52-app.vercel.app` постоянный):
-```bash
-curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://w52-app.vercel.app/api/webhook&secret_token=<WEBHOOK_SECRET>"
+# После смены домена — переустановить webhook:
+curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://w52-app.vercel.app/api/webhook&secret_token=<SECRET>"
+
+# Обновить имя/описание/команды бота:
+curl "https://w52-app.vercel.app/api/setup-bot?secret=<WEBHOOK_SECRET>"
 ```
 
 ---
@@ -310,14 +333,14 @@ curl "https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://w52-app.vercel.
 
 | Решение | Причина |
 |---------|---------|
-| Все контакты/задачи в `localStorage` | Нет пользовательской БД, всё приватно на устройстве |
-| Redis только для сервера | Хранение: регистрации chat_id, задачи для cron, голосовые заметки (24ч TTL) |
-| HuggingFace Whisper (бесплатно) | Транскрипция голоса без затрат, модель `whisper-large-v2` |
+| Все контакты/задачи в `localStorage` | Нет пользовательской БД, данные приватны |
+| Redis только для сервера | chat_id регистрации, задачи cron, голосовые (24ч TTL) |
+| HuggingFace Whisper | Транскрипция голоса бесплатно, `whisper-large-v2` |
 | Прокси Claude API на сервере | Ключ не попадает в браузер |
-| Прокси фото Telegram на сервере | CDN-ссылки из initData протухают, прокси отдаёт свежее фото |
-| QR с `d=<base64>` | Полный профиль передаётся без сервера — работает офлайн |
-| Vercel Serverless + Cron | Нет постоянного сервера, оплата по запросам, бесплатный tier |
+| QR с `d=<base64 JSON>` | Профиль передаётся без сервера — работает офлайн |
+| Vercel Serverless + Cron | Нет постоянного сервера, бесплатный tier |
+| oklch цвета | Современное цветовое пространство, поддержка Safari 15.4+ |
 
 ---
 
-*Последнее обновление: май 2025*
+*Последнее обновление: май 2026*
