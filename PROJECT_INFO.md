@@ -23,7 +23,7 @@
 TELEGRAM_BOT_TOKEN=         # Токен бота от @BotFather
 TELEGRAM_WEBHOOK_SECRET=    # Секрет для верификации webhook
 ANTHROPIC_API_KEY=          # Claude AI (https://console.anthropic.com/)
-HUGGINGFACE_TOKEN=          # Whisper fallback (https://huggingface.co/)
+HUGGINGFACE_TOKEN=          # НЕ ИСПОЛЬЗУЕТСЯ — отказались в пользу Groq
 GROQ_API_KEY=               # Groq — основной AI (быстрый, бесплатный)
 REDIS_URL=                  # Redis для хранения данных
 APP_URL=                    # https://w52-app.vercel.app
@@ -115,12 +115,10 @@ bunx vercel --prod   # Деплой на Vercel
 - **Провайдер:** любой Redis-совместимый (рекомендуется Upstash или Railway Redis)
 - **Используется в:** почти все `api/*.ts` файлы через `api/_lib/redis.ts`
 
-### 🤗 HuggingFace — запасной Whisper
-- **Для чего:** транскрипция голосовых сообщений (`whisper-large-v2`) — запасной вариант если Groq недоступен
-- **Переменная:** `HUGGINGFACE_TOKEN`
-- **Где хранится:** Vercel Dashboard → Settings → Environment Variables
-- **Консоль:** https://huggingface.co/settings/tokens
-- **Используется в:** `api/transcribe.ts`, `api/webhook.ts` (только если Groq не отвечает)
+### 🤗 HuggingFace — НЕ ИСПОЛЬЗУЕТСЯ
+- **Статус:** отказались, заменили на Groq Whisper
+- **Переменная:** `HUGGINGFACE_TOKEN` — не нужно заполнять
+- **Примечание:** мёртвый код остался в `api/transcribe.ts` и `api/webhook.ts` как fallback — можно удалить
 
 ### 🤖 Telegram Bot API
 - **Для чего:** бот @w52_echo_bot — webhook, отправка сообщений, голосовые, inline-query, крон-напоминания
